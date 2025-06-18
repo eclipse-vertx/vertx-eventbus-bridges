@@ -36,6 +36,7 @@
 
   <modules>
     <module>vertx-eventbus-bridges-common</module>
+    <module>vertx-eventbus-bridges-grpc</module>
   </modules>
 
 </project>
