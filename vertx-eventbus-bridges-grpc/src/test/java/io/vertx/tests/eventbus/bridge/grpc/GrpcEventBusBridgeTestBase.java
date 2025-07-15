@@ -1,5 +1,6 @@
 package io.vertx.tests.eventbus.bridge.grpc;
 
+import com.google.protobuf.ByteString;
 import com.google.protobuf.Value;
 import com.google.protobuf.util.JsonFormat;
 import io.vertx.core.Handler;
@@ -17,6 +18,7 @@ import io.vertx.ext.unit.TestContext;
 import io.vertx.ext.unit.junit.VertxUnitRunner;
 import io.vertx.grpc.event.v1alpha.JsonPayload;
 import io.vertx.grpc.event.v1alpha.JsonPayloadType;
+import junit.framework.AssertionFailedError;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.runner.RunWith;
@@ -29,25 +31,41 @@ public abstract class GrpcEventBusBridgeTestBase {
   protected volatile Handler<BridgeEvent> eventHandler = event -> event.complete(true);
 
   /**
+   * Convert a Json value to a JsonPayload
+   */
+  public static JsonPayload jsonToPayload(Object json) {
+    return jsonToPayload(json , JsonPayloadType.proto);
+  }
+
+  /**
    * Convert a JsonObject to a JsonPayload
    */
-  public static JsonPayload jsonToPayload(JsonObject json) {
-    if (json == null) {
-      return JsonPayload.newBuilder().build();
+  public static JsonPayload jsonToPayload(Object json, JsonPayloadType type) {
+    switch (type) {
+      case proto:
+        Value.Builder valueBuilder = Value.newBuilder();
+        try {
+          JsonFormat.parser().merge(Json.encode(json), valueBuilder);
+        } catch (Exception e) {
+          AssertionFailedError afe = new AssertionFailedError();
+          afe.initCause(e);
+          throw afe;
+        }
+        return JsonPayload.newBuilder()
+          .setProtoBody(valueBuilder.build())
+          .build();
+      case binary:
+        return JsonPayload.newBuilder()
+          .setBinaryBody(ByteString.copyFrom(Json.encodeToBuffer(json).getBytes()))
+          .build();
+      case text:
+        return JsonPayload.newBuilder()
+          .setTextBody(Json.encode(json))
+          .build();
+      default:
+        throw new UnsupportedOperationException();
     }
 
-    Value.Builder valueBuilder = Value.newBuilder();
-
-    try {
-      JsonFormat.parser().merge(json.encode(), valueBuilder);
-    } catch (Exception e) {
-      // If parsing fails, fallback to empty value
-      valueBuilder.clear();
-    }
-
-    return JsonPayload.newBuilder()
-      .setProtoBody(valueBuilder.build())
-      .build();
   }
 
   public static JsonObject valueToJson(JsonPayload value) {
@@ -61,7 +79,7 @@ public abstract class GrpcEventBusBridgeTestBase {
     if (value == null) {
       return new JsonObject();
     }
-    
+
     switch (bodyType) {
       case proto:
         JsonObject json = new JsonObject();

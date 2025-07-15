@@ -10,6 +10,7 @@ import io.vertx.core.eventbus.DeliveryOptions;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.eventbus.MessageConsumer;
 import io.vertx.core.eventbus.ReplyException;
+import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
 import io.vertx.eventbus.bridge.grpc.BridgeEvent;
 import io.vertx.ext.bridge.BridgeEventType;
@@ -59,27 +60,23 @@ public abstract class EventBusBridgeHandlerBase<Req, Resp> implements Handler<Gr
    * @param payload a {@link JsonPayload} to convert
    * @return a JSON object representing the message
    */
-  protected static JsonObject protoToJson(JsonPayload payload) {
+  protected static Object protoToJson(JsonPayload payload) {
     if (payload == null) {
       return new JsonObject();
     }
 
     switch (payload.getBodyCase()) {
       case TEXT_BODY:
-        return new JsonObject(payload.getTextBody());
+        return Json.decodeValue(payload.getTextBody());
       case BINARY_BODY:
-        return new JsonObject(Buffer.buffer(payload.getBinaryBody().toByteArray()));
+        return Json.decodeValue(Buffer.buffer(payload.getBinaryBody().toByteArray()));
       case PROTO_BODY: {
-        JsonObject json = new JsonObject();
-
         try {
           String jsonString = JsonFormat.printer().print(payload.getProtoBody());
-          json = new JsonObject(jsonString);
+          return Json.decodeValue(jsonString);
         } catch (Exception ignored) {
-
+          throw new UnsupportedOperationException("Handle me");
         }
-
-        return json;
       }
       default:
         throw new IllegalArgumentException("Invalid payload body case: " + payload.getBodyCase());

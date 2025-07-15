@@ -196,12 +196,12 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
     Empty resp = grpcClient.ping(Empty.getDefaultInstance()).await();
   }
 
-  private JsonObject testSendWithBody(JsonPayload payload) throws Exception {
-    CompletableFuture<JsonObject> body = testConsumer();
+  private <T> T testSendWithBody(T payload) throws Exception {
+    CompletableFuture<T> body = testConsumer();
 
     SendOp request = SendOp.newBuilder()
       .setAddress("test")
-      .setBody(payload)
+      .setBody(jsonToPayload(payload))
       .build();
 
     grpcClient.send(request).await();
@@ -222,10 +222,10 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
     return body.get(5, TimeUnit.SECONDS);
   }
 
-  private CompletableFuture<JsonObject> testConsumer() throws Exception {
-    CompletableFuture<JsonObject> body = new CompletableFuture<>();
+  private <T> CompletableFuture<T> testConsumer() throws Exception {
+    CompletableFuture<T> body = new CompletableFuture<>();
 
-    vertx.eventBus().consumer("test", (Message<JsonObject> msg) -> {
+    vertx.eventBus().consumer("test", (Message<T> msg) -> {
       body.complete(msg.body());
     });
 
@@ -234,7 +234,7 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
 
   @Test
   public void testSendWithStringBody() throws Exception {
-    JsonObject body = testSendWithBody(jsonToPayload(new JsonObject().put("message", "simple string message")));
+    JsonObject body = testSendWithBody(new JsonObject().put("message", "simple string message"));
     assertEquals("simple string message", body.getString("message"));
   }
 
@@ -244,32 +244,24 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
       .put("port", 8080)
       .put("version", 4.0)
       .put("timeout", 1000L);
-    JsonObject body = testSendWithBody(jsonToPayload(numericBody));
-    assertEquals(8080, (int)body.getInteger("port"));
-    assertEquals(4.0, (double)body.getDouble("version"), 0.001);
-    assertEquals(1000L, (long)body.getLong("timeout"));
+    Double body = testSendWithBody(5.1D);
+    assertEquals(5.1, (double)body, 0.01D);
   }
 
   @Test
   public void testSendWithBooleanBody() throws Exception {
-    JsonObject body = testSendWithBody(jsonToPayload(new JsonObject()
-      .put("isActive", true)
-      .put("isDeleted", false)));
-    assertTrue(body.getBoolean("isActive"));
-    assertFalse(body.getBoolean("isDeleted"));
+    Boolean body = testSendWithBody(true);
+    assertTrue(body);
   }
 
   @Test
   public void testSendWithNullBody() throws Exception {
-    JsonObject body = testSendWithBody(jsonToPayload(new JsonObject()
-      .putNull("nullField")
-      .put("notNullField", "not null")));
-    assertNull(body.getValue("nullField"));
-    assertEquals("not null", body.getString("notNullField"));
+    Object body = testSendWithBody(null);
+    assertNull(body);
   }
 
   @Test
-  public void testSendWithNestedObjectBody(TestContext context) throws Exception {
+  public void testSendWithNestedObjectBody() throws Exception {
     JsonObject nestedBody = new JsonObject()
       .put("name", "Julien")
       .put("address", new JsonObject()
@@ -279,7 +271,7 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
         .put("contact", new JsonObject()
           .put("email", "julien@vertx.io")
           .put("phone", "+99-9-99-99-99-99")));
-    JsonObject body = testSendWithBody(jsonToPayload(nestedBody));
+    JsonObject body = testSendWithBody(nestedBody);
     assertEquals("Julien", body.getString("name"));
     JsonObject address = body.getJsonObject("address");
     assertNotNull(address);
@@ -294,7 +286,7 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
 
   @Test
   public void testSendWithEmptyBody() throws Exception {
-    JsonObject body = testSendWithBody(jsonToPayload(new JsonObject()));
+    JsonObject body = testSendWithBody(new JsonObject());
     assertTrue(body.isEmpty());
   }
 

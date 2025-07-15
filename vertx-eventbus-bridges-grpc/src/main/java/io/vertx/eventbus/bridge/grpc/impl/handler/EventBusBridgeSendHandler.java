@@ -37,7 +37,7 @@ public class EventBusBridgeSendHandler extends EventBusBridgeHandlerBase<SendOp,
         return;
       }
 
-      JsonObject body = protoToJson(eventRequest.getBody());
+      Object body = protoToJson(eventRequest.getBody());
       JsonObject eventJson = createEvent("send", eventRequest);
 
       if (!checkMatches(true, address)) {

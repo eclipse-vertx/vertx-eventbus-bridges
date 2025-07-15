@@ -42,7 +42,7 @@ public class EventBusBridgeRequestHandler extends EventBusBridgeHandlerBase<Requ
         return;
       }
 
-      JsonObject body = protoToJson(eventRequest.getBody());
+      Object body = protoToJson(eventRequest.getBody());
       JsonObject eventJson = createEvent("send", eventRequest);
 
       if (!checkMatches(true, address)) {
