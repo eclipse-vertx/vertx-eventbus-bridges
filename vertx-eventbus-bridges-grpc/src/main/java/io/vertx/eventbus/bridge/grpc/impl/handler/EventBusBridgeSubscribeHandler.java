@@ -24,6 +24,17 @@ import java.util.regex.Pattern;
 
 public class EventBusBridgeSubscribeHandler extends EventBusBridgeHandlerBase<SubscribeOp, EventBusMessage> {
 
+  private final Map<String, Subscription> subscriptions = new ConcurrentHashMap<>();
+
+  private static class Subscription {
+    final GrpcServerRequest<SubscribeOp, EventBusMessage> request;
+    final MessageConsumer<?> consumer;
+    Subscription(GrpcServerRequest<SubscribeOp, EventBusMessage> request, MessageConsumer<?> consumer) {
+      this.request = request;
+      this.consumer = consumer;
+    }
+  }
+
   public static final ServiceMethod<SubscribeOp, EventBusMessage> SERVICE_METHOD = ServiceMethod.server(
     ServiceName.create("vertx.event.v1alpha.EventBusBridge"),
     "Subscribe",
@@ -54,7 +65,6 @@ public class EventBusBridgeSubscribeHandler extends EventBusBridgeHandlerBase<Su
       checkCallHook(BridgeEventType.REGISTER, event,
         () -> {
           String consumerId = UUID.randomUUID().toString();
-          requests.put(consumerId, request);
 
           request.response().headers().set("vertx-event-bus-consumer-id", consumerId);
           request.response().writeHead();
@@ -62,11 +72,14 @@ public class EventBusBridgeSubscribeHandler extends EventBusBridgeHandlerBase<Su
           MessageConsumer<Object> consumer = bus.consumer(address,
             new BridgeMessageConsumer(request, address, consumerId, eventRequest.getMessageBodyFormat()));
 
-          Map<String, MessageConsumer<?>> addressConsumers = consumers.computeIfAbsent(address, k -> new ConcurrentHashMap<>());
-          addressConsumers.put(consumerId, consumer);
+          Subscription subscription = new Subscription(request, consumer);
 
-          request.connection().closeHandler(v -> unregisterConsumer(address, consumerId));
-        },
+          subscriptions.put(consumerId, subscription);
+
+          request.exceptionHandler(err -> {
+            unregisterConsumer(consumerId);
+          });
+       },
         () -> replyStatus(request, GrpcStatus.PERMISSION_DENIED));
     });
   }
@@ -139,6 +152,26 @@ public class EventBusBridgeSubscribeHandler extends EventBusBridgeHandlerBase<Su
       request.resume();
       request.response().write(response);
       request.pause();
+    }
+  }
+
+  /**
+   * Unregisters a consumer from the EventBus.
+   * <p>
+   * This method is called when a client wants to unsubscribe from an address. It removes the consumer from the internal maps and unregisters it from the EventBus. If this was the
+   * last consumer for the address, it also removes the address from the map.
+   *
+   * @param consumerId the unique ID of the consumer to unregister
+   * @return true if the consumer was found and unregistered, false otherwise
+   */
+  protected boolean unregisterConsumer(String consumerId) {
+    Subscription subscription = subscriptions.remove(consumerId);
+    if (subscription != null) {
+      subscription.request.response().end();
+      subscription.consumer.unregister();
+      return true;
+    } else {
+      return false;
     }
   }
 }

@@ -36,9 +36,7 @@ import java.util.regex.Pattern;
  */
 public abstract class EventBusBridgeHandlerBase<Req, Resp> implements Handler<GrpcServerRequest<Req, Resp>> {
 
-  protected static final Map<String, Map<String, MessageConsumer<?>>> consumers = new ConcurrentHashMap<>();
   protected static final Map<String, io.vertx.core.eventbus.Message<?>> replies = new ConcurrentHashMap<>();
-  protected static final Map<String, GrpcServerRequest<SubscribeOp, EventBusMessage>> requests = new ConcurrentHashMap<>();
 
   protected final EventBus bus;
   protected final BridgeOptions options;
@@ -307,44 +305,6 @@ public abstract class EventBusBridgeHandlerBase<Req, Resp> implements Handler<Gr
         .setStatus(Status.newBuilder().setCode(500).setMessage(error.getMessage()).build())
         .build();
     }
-  }
-
-  /**
-   * Unregisters a consumer from the EventBus.
-   *
-   * This method is called when a client wants to unsubscribe from an address. It removes the consumer from the internal maps and unregisters it from the EventBus. If this was the
-   * last consumer for the address, it also removes the address from the map.
-   *
-   * @param address the address the consumer is subscribed to
-   * @param consumerId the unique ID of the consumer to unregister
-   * @return true if the consumer was found and unregistered, false otherwise
-   */
-  protected boolean unregisterConsumer(String address, String consumerId) {
-    // Get the map of consumers for this address
-    Map<String, MessageConsumer<?>> addressConsumers = consumers.get(address);
-    if (addressConsumers != null) {
-      // Remove the consumer from the map
-      MessageConsumer<?> consumer = addressConsumers.remove(consumerId);
-
-      // Remove any associated gRPC request and end the response stream
-      GrpcServerRequest<SubscribeOp, EventBusMessage> request = requests.remove(consumerId);
-      if (request != null) {
-        request.response().end();
-      }
-
-      // If the consumer was found, unregister it from the EventBus
-      if (consumer != null) {
-        consumer.unregister();
-
-        // If this was the last consumer for this address, remove the address from the map
-        if (addressConsumers.isEmpty()) {
-          consumers.remove(address);
-        }
-
-        return true;
-      }
-    }
-    return false;
   }
 
   /**

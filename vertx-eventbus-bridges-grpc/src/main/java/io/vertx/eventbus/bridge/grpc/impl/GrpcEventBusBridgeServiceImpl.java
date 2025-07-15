@@ -46,12 +46,13 @@ public class GrpcEventBusBridgeServiceImpl implements GrpcEventBusBridgeService 
 
   @Override
   public void bind(GrpcServer server) {
+    EventBusBridgeSubscribeHandler a;
     // Register handlers for all supported operations
     server.callHandler(EventBusBridgePublishHandler.SERVICE_METHOD, new EventBusBridgePublishHandler(eventBus, options, bridgeEventHandler, compiledREs));
     server.callHandler(EventBusBridgeSendHandler.SERVICE_METHOD, new EventBusBridgeSendHandler(eventBus, options, bridgeEventHandler, compiledREs));
     server.callHandler(EventBusBridgeRequestHandler.SERVICE_METHOD, new EventBusBridgeRequestHandler(eventBus, options, bridgeEventHandler, compiledREs));
-    server.callHandler(EventBusBridgeSubscribeHandler.SERVICE_METHOD, new EventBusBridgeSubscribeHandler(eventBus, options, bridgeEventHandler, compiledREs));
-    server.callHandler(EventBusBridgeUnsubscribeHandler.SERVICE_METHOD, new EventBusBridgeUnsubscribeHandler(eventBus, options, bridgeEventHandler, compiledREs));
+    server.callHandler(EventBusBridgeSubscribeHandler.SERVICE_METHOD, a = new EventBusBridgeSubscribeHandler(eventBus, options, bridgeEventHandler, compiledREs));
+    server.callHandler(EventBusBridgeUnsubscribeHandler.SERVICE_METHOD, new EventBusBridgeUnsubscribeHandler(eventBus, options, bridgeEventHandler, compiledREs, a));
     server.callHandler(EventBusBridgePingHandler.SERVICE_METHOD, new EventBusBridgePingHandler(eventBus, options, bridgeEventHandler, compiledREs));
   }
 }

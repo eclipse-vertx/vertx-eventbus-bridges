@@ -100,11 +100,8 @@ message SubscribeOp {
 
 // Message used for unsubscribing from an address
 message UnsubscribeOp {
-  // The address to unsubscribe from
-  string address = 1;
-
   // The consumer ID for subscription management
-  string consumer_id = 2;
+  string consumer_id = 1;
 }
 
 // Message received from the event bus

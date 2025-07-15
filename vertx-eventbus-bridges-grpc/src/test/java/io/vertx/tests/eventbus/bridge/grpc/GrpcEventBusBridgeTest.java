@@ -186,7 +186,6 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
         context.assertEquals("hi", jsonBody.getString("value"));
 
         UnsubscribeOp unsubRequest = UnsubscribeOp.newBuilder()
-          .setAddress("ping")
           .setConsumerId(consumerId)
           .build();
 
@@ -400,7 +399,6 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
 
       if (subscribed.compareAndSet(true, false)) {
         UnsubscribeOp unsubRequest = UnsubscribeOp.newBuilder()
-          .setAddress("complex-ping")
           .setConsumerId(consumerId.get())
           .build();
 
@@ -465,7 +463,6 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
     grpcClient.subscribe(request).onComplete(context.asyncAssertSuccess(stream -> stream.handler(response -> {
       consumerId.set(response.getConsumerId());
       UnsubscribeOp unsubRequest = UnsubscribeOp.newBuilder()
-        .setAddress("ping")
         .setConsumerId(consumerId.get())
         .build();
 
@@ -481,7 +478,6 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
   @Test
   public void testUnsubscribeInvalidConsumerId(TestContext context) {
     UnsubscribeOp unsubRequest = UnsubscribeOp.newBuilder()
-      .setAddress("ping")
       .setConsumerId("invalid-consumer-id")
       .build();
 
@@ -517,14 +513,12 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
         context.assertNotEquals(consumerId1.get(), consumerId2.get());
 
         UnsubscribeOp unsubRequest1 = UnsubscribeOp.newBuilder()
-          .setAddress("ping")
           .setConsumerId(consumerId1.get())
           .build();
 
         grpcClient.unsubscribe(unsubRequest1).onComplete(context.asyncAssertSuccess(unsubResponse1 -> {
           async.countDown();
           UnsubscribeOp unsubRequest2 = UnsubscribeOp.newBuilder()
-            .setAddress("ping")
             .setConsumerId(consumerId2.get())
             .build();
 
@@ -768,7 +762,6 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
         System.out.println("[DEBUG] Time difference between first and last message: " + timeDifference + "ms");
 
         UnsubscribeOp unsubRequest = UnsubscribeOp.newBuilder()
-          .setAddress("ping")
           .setConsumerId(consumerId.get())
           .build();
 

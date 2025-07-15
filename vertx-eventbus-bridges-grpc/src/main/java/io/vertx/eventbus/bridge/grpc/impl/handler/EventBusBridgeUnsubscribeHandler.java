@@ -23,20 +23,19 @@ public class EventBusBridgeUnsubscribeHandler extends EventBusBridgeHandlerBase<
     GrpcMessageEncoder.encoder(),
     GrpcMessageDecoder.decoder(UnsubscribeOp.newBuilder()));
 
-  public EventBusBridgeUnsubscribeHandler(EventBus bus, BridgeOptions options, Handler<BridgeEvent> bridgeEventHandler, Map<String, Pattern> compiledREs) {
+  private final EventBusBridgeSubscribeHandler subscribeHandler;
+
+  public EventBusBridgeUnsubscribeHandler(EventBus bus, BridgeOptions options, Handler<BridgeEvent> bridgeEventHandler,
+                                          Map<String, Pattern> compiledREs, EventBusBridgeSubscribeHandler subscribeHandler) {
     super(bus, options, bridgeEventHandler, compiledREs);
+
+    this.subscribeHandler = subscribeHandler;
   }
 
   @Override
   public void handle(GrpcServerRequest<UnsubscribeOp, Empty> request) {
     request.handler(eventRequest -> {
-      String address = eventRequest.getAddress();
       String consumerId = eventRequest.getConsumerId();
-
-      if (address.isEmpty()) {
-        replyStatus(request, GrpcStatus.INVALID_ARGUMENT, "Invalid address");
-        return;
-      }
 
       if (consumerId.isEmpty()) {
         replyStatus(request, GrpcStatus.INVALID_ARGUMENT, "Invalid consumer id");
@@ -45,14 +44,9 @@ public class EventBusBridgeUnsubscribeHandler extends EventBusBridgeHandlerBase<
 
       JsonObject eventJson = createEvent("unregister", eventRequest);
 
-      if (!checkMatches(false, address)) {
-        replyStatus(request, GrpcStatus.PERMISSION_DENIED);
-        return;
-      }
-
       checkCallHook(BridgeEventType.UNREGISTER, eventJson,
         () -> {
-          if (unregisterConsumer(address, consumerId)) {
+          if (subscribeHandler.unregisterConsumer(consumerId)) {
             request.response().end(Empty.getDefaultInstance());
           } else {
             request.response().status(GrpcStatus.NOT_FOUND).end();
@@ -68,11 +62,6 @@ public class EventBusBridgeUnsubscribeHandler extends EventBusBridgeHandlerBase<
 
     if (request == null) {
       return event;
-    }
-
-    // Add address if present
-    if (!request.getAddress().isEmpty()) {
-      event.put("address", request.getAddress());
     }
 
     // Add consumer ID if present
