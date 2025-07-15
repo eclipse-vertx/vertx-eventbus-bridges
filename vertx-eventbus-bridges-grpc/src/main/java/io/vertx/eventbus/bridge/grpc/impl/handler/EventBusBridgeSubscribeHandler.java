@@ -12,6 +12,8 @@ import io.vertx.ext.bridge.BridgeEventType;
 import io.vertx.ext.bridge.BridgeOptions;
 import io.vertx.grpc.common.*;
 import io.vertx.grpc.event.v1alpha.EventBusMessage;
+import io.vertx.grpc.event.v1alpha.JsonPayload;
+import io.vertx.grpc.event.v1alpha.JsonPayloadType;
 import io.vertx.grpc.event.v1alpha.SubscribeOp;
 import io.vertx.grpc.server.GrpcServerRequest;
 
@@ -29,7 +31,8 @@ public class EventBusBridgeSubscribeHandler extends EventBusBridgeHandlerBase<Su
     GrpcMessageEncoder.encoder(),
     GrpcMessageDecoder.decoder(SubscribeOp.newBuilder()));
 
-  public EventBusBridgeSubscribeHandler(EventBus bus, BridgeOptions options, Handler<BridgeEvent> bridgeEventHandler, Map<String, Pattern> compiledREs) {
+  public EventBusBridgeSubscribeHandler(EventBus bus, BridgeOptions options, Handler<BridgeEvent> bridgeEventHandler,
+                                        Map<String, Pattern> compiledREs) {
     super(bus, options, bridgeEventHandler, compiledREs);
   }
 
@@ -54,7 +57,8 @@ public class EventBusBridgeSubscribeHandler extends EventBusBridgeHandlerBase<Su
           String consumerId = UUID.randomUUID().toString();
           requests.put(consumerId, request);
 
-          MessageConsumer<Object> consumer = bus.consumer(address, new BridgeMessageConsumer(request, address, consumerId));
+          MessageConsumer<Object> consumer = bus.consumer(address,
+            new BridgeMessageConsumer(request, address, consumerId, eventRequest.getBodyType()));
 
           Map<String, MessageConsumer<?>> addressConsumers = consumers.computeIfAbsent(address, k -> new ConcurrentHashMap<>());
           addressConsumers.put(consumerId, consumer);
@@ -97,11 +101,14 @@ public class EventBusBridgeSubscribeHandler extends EventBusBridgeHandlerBase<Su
     private final GrpcServerRequest<SubscribeOp, EventBusMessage> request;
     private final String address;
     private final String consumerId;
+    private final JsonPayloadType bodyType;
 
-    BridgeMessageConsumer(GrpcServerRequest<SubscribeOp, EventBusMessage> request, String address, String consumerId) {
+    BridgeMessageConsumer(GrpcServerRequest<SubscribeOp, EventBusMessage> request, String address,
+                          String consumerId, JsonPayloadType bodyType) {
       this.request = request;
       this.address = address;
       this.consumerId = consumerId;
+      this.bodyType = bodyType;
     }
 
     @Override
@@ -111,14 +118,13 @@ public class EventBusBridgeSubscribeHandler extends EventBusBridgeHandlerBase<Su
         responseHeaders.put(entry.getKey(), entry.getValue());
       }
 
-      Value body;
-
+      JsonPayload body;
       if (message.body() instanceof JsonObject) {
-        body = jsonToProto((JsonObject) message.body());
+        body = jsonToProto((JsonObject) message.body(), bodyType);
       } else if (message.body() instanceof String) {
-        body = jsonToProto(new JsonObject(String.valueOf(message.body())));
+        body = jsonToProto(new JsonObject(String.valueOf(message.body())), bodyType);
       } else {
-        body = jsonToProto(new JsonObject().put("value", String.valueOf(message.body())));
+        body = jsonToProto(new JsonObject().put("value", String.valueOf(message.body())), bodyType);
       }
 
       EventBusMessage response = EventBusMessage.newBuilder()

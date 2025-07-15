@@ -12,6 +12,8 @@ import io.vertx.ext.bridge.BridgeEventType;
 import io.vertx.ext.bridge.BridgeOptions;
 import io.vertx.grpc.common.*;
 import io.vertx.grpc.event.v1alpha.EventBusMessage;
+import io.vertx.grpc.event.v1alpha.JsonPayload;
+import io.vertx.grpc.event.v1alpha.JsonPayloadType;
 import io.vertx.grpc.event.v1alpha.RequestOp;
 import io.vertx.grpc.server.GrpcServerRequest;
 
@@ -64,14 +66,15 @@ public class EventBusBridgeRequestHandler extends EventBusBridgeHandlerBase<Requ
                 responseHeaders.put(entry.getKey(), entry.getValue());
               }
 
-              Value replyBody;
+              JsonPayloadType replyBodyType = eventRequest.getReplyBodyType();
+              JsonPayload replyBody;
 
               if (reply.body() instanceof JsonObject) {
-                replyBody = jsonToProto((JsonObject) reply.body());
+                replyBody = jsonToProto((JsonObject) reply.body(), replyBodyType);
               } else if (reply.body() instanceof String) {
-                replyBody = jsonToProto(new JsonObject().put("value", reply.body()));
+                replyBody = jsonToProto(new JsonObject().put("value", reply.body()), replyBodyType);
               } else {
-                replyBody = jsonToProto(new JsonObject().put("value", String.valueOf(reply.body())));
+                replyBody = jsonToProto(new JsonObject().put("value", String.valueOf(reply.body())), replyBodyType);
               }
 
               EventBusMessage response = EventBusMessage.newBuilder()

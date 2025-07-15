@@ -156,10 +156,19 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
   }
 
   @Test
-  public void testSubscribe(TestContext context) {
+  public void testSubscribeWithProtoType(TestContext context) {
+    testSubscribe(context, JsonPayloadType.proto);
+  }
+
+  @Test
+  public void testSubscribeWithBinaryType(TestContext context) {
+    testSubscribe(context, JsonPayloadType.binary);
+  }
+
+  private void testSubscribe(TestContext context, JsonPayloadType bodyType) {
     Async async = context.async();
     AtomicReference<String> consumerId = new AtomicReference<>();
-    SubscribeOp request = SubscribeOp.newBuilder().setAddress("ping").build();
+    SubscribeOp request = SubscribeOp.newBuilder().setAddress("ping").setBodyType(bodyType).build();
 
     grpcClient.subscribe(request).onComplete(context.asyncAssertSuccess(stream -> stream.handler(response -> {
       consumerId.set(response.getConsumer());
@@ -167,8 +176,8 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
       context.assertEquals("ping", response.getAddress());
       context.assertNotNull(response.getBody());
 
-      Value body = response.getBody();
-      JsonObject jsonBody = valueToJson(body);
+      JsonPayload body = response.getBody();
+      JsonObject jsonBody = valueToJson(body, bodyType);
       context.assertEquals("hi", jsonBody.getString("value"));
 
       UnsubscribeOp unsubRequest = UnsubscribeOp.newBuilder()
@@ -370,7 +379,7 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
       context.assertEquals("complex-ping", response.getAddress());
       context.assertNotNull(response.getBody());
 
-      Value body = response.getBody();
+      JsonPayload body = response.getBody();
       JsonObject jsonBody = valueToJson(body);
 
       context.assertEquals("vertx-msg-001", jsonBody.getString("messageId"));
@@ -742,7 +751,7 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
       context.assertEquals("ping", response.getAddress());
       context.assertNotNull(response.getBody());
 
-      Value body = response.getBody();
+      JsonPayload body = response.getBody();
       JsonObject jsonBody = valueToJson(body);
       context.assertEquals("hi", jsonBody.getString("value"));
 

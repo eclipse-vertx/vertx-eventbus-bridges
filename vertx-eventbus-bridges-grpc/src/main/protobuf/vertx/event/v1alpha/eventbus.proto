@@ -75,8 +75,11 @@ message RequestOp {
   // Message payload
   JsonPayload body = 4;
 
+  // The desired type of the reply body
+  JsonPayloadType replyBodyType = 5;
+
   // Timeout in milliseconds
-  google.protobuf.Duration timeout = 5;
+  google.protobuf.Duration timeout = 6;
 }
 
 // Message used for subscribing to an address
@@ -89,6 +92,9 @@ message SubscribeOp {
 
   // Message headers
   map<string, string> headers = 3;
+
+  // The desired type of the body sent by the bridge
+  JsonPayloadType body_type = 4;
 }
 
 // Message used for unsubscribing from an address
@@ -115,10 +121,19 @@ message EventBusMessage {
   map<string, string> headers = 4;
 
   // Message payload
-  google.protobuf.Value body = 5;
+  JsonPayload body = 5;
 
   // Optional status for error responses
   google.rpc.Status status = 6;
+}
+
+enum JsonPayloadType {
+  // google.protobuf.Value (default)
+  proto = 0;
+  // protobuf encoded json string encoded as a byte array
+  binary = 1;
+  // protobuf encoded json string
+  text = 2;
 }
 
 message JsonPayload {

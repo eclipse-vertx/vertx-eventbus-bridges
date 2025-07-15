@@ -4,7 +4,9 @@ import com.google.protobuf.Value;
 import com.google.protobuf.util.JsonFormat;
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
+import io.vertx.core.buffer.Buffer;
 import io.vertx.core.eventbus.Message;
+import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
 import io.vertx.eventbus.bridge.grpc.BridgeEvent;
 import io.vertx.eventbus.bridge.grpc.GrpcEventBusBridge;
@@ -14,6 +16,7 @@ import io.vertx.ext.unit.Async;
 import io.vertx.ext.unit.TestContext;
 import io.vertx.ext.unit.junit.VertxUnitRunner;
 import io.vertx.grpc.event.v1alpha.JsonPayload;
+import io.vertx.grpc.event.v1alpha.JsonPayloadType;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.runner.RunWith;
@@ -47,22 +50,35 @@ public abstract class GrpcEventBusBridgeTestBase {
       .build();
   }
 
+  public static JsonObject valueToJson(JsonPayload value) {
+    return valueToJson(value, JsonPayloadType.proto);
+  }
+
   /**
    * Convert a Protobuf Value to a JsonObject
    */
-  public static JsonObject valueToJson(Value value) {
+  public static JsonObject valueToJson(JsonPayload value, JsonPayloadType bodyType) {
     if (value == null) {
       return new JsonObject();
     }
-
-    JsonObject json = new JsonObject();
-    try {
-      String jsonString = JsonFormat.printer().print(value);
-      json = new JsonObject(jsonString);
-    } catch (Exception e) {
-      // If parsing fails, return empty object
+    
+    switch (bodyType) {
+      case proto:
+        JsonObject json = new JsonObject();
+        try {
+          String jsonString = JsonFormat.printer().print(value.getProtoBody());
+          json = new JsonObject(jsonString);
+        } catch (Exception e) {
+          // If parsing fails, return empty object
+        }
+        return json;
+      case binary:
+        return new JsonObject(Buffer.buffer(value.getBinaryBody().toByteArray()));
+      case text:
+        return new JsonObject(value.getTextBody());
+      default:
+        throw new UnsupportedOperationException();
     }
-    return json;
   }
 
   @Before

@@ -1,5 +1,6 @@
 package io.vertx.eventbus.bridge.grpc.impl;
 
+import com.google.protobuf.ByteString;
 import com.google.protobuf.Value;
 import com.google.protobuf.util.JsonFormat;
 import com.google.rpc.Status;
@@ -17,6 +18,7 @@ import io.vertx.ext.bridge.PermittedOptions;
 import io.vertx.grpc.common.GrpcStatus;
 import io.vertx.grpc.event.v1alpha.EventBusMessage;
 import io.vertx.grpc.event.v1alpha.JsonPayload;
+import io.vertx.grpc.event.v1alpha.JsonPayloadType;
 import io.vertx.grpc.event.v1alpha.SubscribeOp;
 import io.vertx.grpc.server.GrpcServerRequest;
 
@@ -92,16 +94,25 @@ public abstract class EventBusBridgeHandlerBase<Req, Resp> implements Handler<Gr
    * @param json the JSON object to convert
    * @return a Protocol Buffers message representing the JSON object
    */
-  protected static Value jsonToProto(JsonObject json) {
-    Value.Builder builder = Value.newBuilder();
-
-    try {
-      JsonFormat.parser().merge(json.encode(), builder);
-    } catch (Exception ignored) {
-
+  public static JsonPayload jsonToProto(JsonObject json, JsonPayloadType payloadType) {
+    JsonPayload.Builder payloadBuilder = JsonPayload.newBuilder();
+    switch (payloadType) {
+      case proto:
+        Value.Builder structBuilder = Value.newBuilder();
+        try {
+          JsonFormat.parser().merge(json.encode(), structBuilder);
+        } catch (Exception ignored) {
+        }
+        payloadBuilder.setProtoBody(structBuilder);
+        break;
+      case binary:
+        payloadBuilder.setBinaryBody(ByteString.copyFrom(json.toBuffer().getBytes()));
+        break;
+      case text:
+        payloadBuilder.setTextBody(json.encode());
+        break;
     }
-
-    return builder.build();
+    return payloadBuilder.build();
   }
 
   /**
