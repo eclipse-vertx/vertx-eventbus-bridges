@@ -56,6 +56,9 @@ public class EventBusBridgeSubscribeHandler extends EventBusBridgeHandlerBase<Su
           String consumerId = UUID.randomUUID().toString();
           requests.put(consumerId, request);
 
+          request.response().headers().set("vertx-event-bus-consumer-id", consumerId);
+          request.response().writeHead();
+
           MessageConsumer<Object> consumer = bus.consumer(address,
             new BridgeMessageConsumer(request, address, consumerId, eventRequest.getMessageBodyFormat()));
 
@@ -79,11 +82,6 @@ public class EventBusBridgeSubscribeHandler extends EventBusBridgeHandlerBase<Su
     // Add address if present
     if (!request.getAddress().isEmpty()) {
       event.put("address", request.getAddress());
-    }
-
-    // Add consumer ID if present
-    if (!request.getConsumer().isEmpty()) {
-      event.put("consumer", request.getConsumer());
     }
 
     // Add headers if present
@@ -128,7 +126,7 @@ public class EventBusBridgeSubscribeHandler extends EventBusBridgeHandlerBase<Su
 
       EventBusMessage response = EventBusMessage.newBuilder()
         .setAddress(address)
-        .setConsumer(consumerId)
+        .setConsumerId(consumerId)
         .putAllHeaders(responseHeaders)
         .setBody(body)
         .build();

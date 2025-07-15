@@ -3,6 +3,7 @@ package io.vertx.tests.eventbus.bridge.grpc;
 import com.google.protobuf.Empty;
 import com.google.protobuf.Value;
 import com.google.protobuf.util.Durations;
+import io.vertx.core.MultiMap;
 import io.vertx.core.eventbus.Message;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.net.SocketAddress;
@@ -10,6 +11,7 @@ import io.vertx.core.streams.ReadStream;
 import io.vertx.ext.unit.Async;
 import io.vertx.ext.unit.TestContext;
 import io.vertx.grpc.client.GrpcClient;
+import io.vertx.grpc.client.GrpcClientResponse;
 import io.vertx.grpc.event.v1alpha.*;
 import org.junit.After;
 import org.junit.Test;
@@ -167,26 +169,30 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
 
   private void testSubscribe(TestContext context, JsonValueFormat format) {
     Async async = context.async();
-    AtomicReference<String> consumerId = new AtomicReference<>();
     SubscribeOp request = SubscribeOp.newBuilder().setAddress("ping").setMessageBodyFormat(format).build();
 
-    grpcClient.subscribe(request).onComplete(context.asyncAssertSuccess(stream -> stream.handler(response -> {
-      consumerId.set(response.getConsumer());
+    grpcClient.subscribe(request).onComplete(context.asyncAssertSuccess(stream -> {
 
-      context.assertEquals("ping", response.getAddress());
-      context.assertNotNull(response.getBody());
+      MultiMap headers = ((GrpcClientResponse<?, ?>) stream).headers();
+      String consumerId = headers.get("vertx-event-bus-consumer-id");
 
-      JsonValue body = response.getBody();
-      JsonObject jsonBody = valueToJson(body, format);
-      context.assertEquals("hi", jsonBody.getString("value"));
+      stream.handler(response -> {
 
-      UnsubscribeOp unsubRequest = UnsubscribeOp.newBuilder()
-        .setAddress("ping")
-        .setConsumer(consumerId.get())
-        .build();
+        context.assertEquals("ping", response.getAddress());
+        context.assertNotNull(response.getBody());
 
-      grpcClient.unsubscribe(unsubRequest).onComplete(context.asyncAssertSuccess(unsubResponse -> async.complete()));
-    })));
+        JsonValue body = response.getBody();
+        JsonObject jsonBody = valueToJson(body, format);
+        context.assertEquals("hi", jsonBody.getString("value"));
+
+        UnsubscribeOp unsubRequest = UnsubscribeOp.newBuilder()
+          .setAddress("ping")
+          .setConsumerId(consumerId)
+          .build();
+
+        grpcClient.unsubscribe(unsubRequest).onComplete(context.asyncAssertSuccess(unsubResponse -> async.complete()));
+      });
+    }));
 
     async.awaitSuccess(5000);
   }
@@ -366,7 +372,7 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
     ReadStream<EventBusMessage> stream = grpcClient.subscribe(request).await();
     AtomicBoolean subscribed = new AtomicBoolean(true);
     stream.handler(response -> {
-      consumerId.set(response.getConsumer());
+      consumerId.set(response.getConsumerId());
 
       context.assertEquals("complex-ping", response.getAddress());
       context.assertNotNull(response.getBody());
@@ -395,7 +401,7 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
       if (subscribed.compareAndSet(true, false)) {
         UnsubscribeOp unsubRequest = UnsubscribeOp.newBuilder()
           .setAddress("complex-ping")
-          .setConsumer(consumerId.get())
+          .setConsumerId(consumerId.get())
           .build();
 
         grpcClient
@@ -457,10 +463,10 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
     SubscribeOp request = SubscribeOp.newBuilder().setAddress("ping").build();
 
     grpcClient.subscribe(request).onComplete(context.asyncAssertSuccess(stream -> stream.handler(response -> {
-      consumerId.set(response.getConsumer());
+      consumerId.set(response.getConsumerId());
       UnsubscribeOp unsubRequest = UnsubscribeOp.newBuilder()
         .setAddress("ping")
-        .setConsumer(consumerId.get())
+        .setConsumerId(consumerId.get())
         .build();
 
       grpcClient.unsubscribe(unsubRequest).onComplete(context.asyncAssertSuccess(unsubResponse -> {
@@ -476,7 +482,7 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
   public void testUnsubscribeInvalidConsumerId(TestContext context) {
     UnsubscribeOp unsubRequest = UnsubscribeOp.newBuilder()
       .setAddress("ping")
-      .setConsumer("invalid-consumer-id")
+      .setConsumerId("invalid-consumer-id")
       .build();
 
     try {
@@ -499,7 +505,7 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
         return;
       }
 
-      consumerId1.set(response.getConsumer());
+      consumerId1.set(response.getConsumerId());
 
       // Second subscription
       grpcClient.subscribe(request).onComplete(context.asyncAssertSuccess(stream2 -> stream2.handler(response2 -> {
@@ -507,19 +513,19 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
           return;
         }
 
-        consumerId2.set(response2.getConsumer());
+        consumerId2.set(response2.getConsumerId());
         context.assertNotEquals(consumerId1.get(), consumerId2.get());
 
         UnsubscribeOp unsubRequest1 = UnsubscribeOp.newBuilder()
           .setAddress("ping")
-          .setConsumer(consumerId1.get())
+          .setConsumerId(consumerId1.get())
           .build();
 
         grpcClient.unsubscribe(unsubRequest1).onComplete(context.asyncAssertSuccess(unsubResponse1 -> {
           async.countDown();
           UnsubscribeOp unsubRequest2 = UnsubscribeOp.newBuilder()
             .setAddress("ping")
-            .setConsumer(consumerId2.get())
+            .setConsumerId(consumerId2.get())
             .build();
 
           grpcClient.unsubscribe(unsubRequest2).onComplete(context.asyncAssertSuccess(unsubResponse2 -> async.countDown()));
@@ -737,7 +743,7 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
 
     grpcClient.subscribe(request).onComplete(context.asyncAssertSuccess(stream -> stream.handler(response -> {
       if (consumerId.get() == null) {
-        consumerId.set(response.getConsumer());
+        consumerId.set(response.getConsumerId());
       }
 
       context.assertEquals("ping", response.getAddress());
@@ -763,7 +769,7 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
 
         UnsubscribeOp unsubRequest = UnsubscribeOp.newBuilder()
           .setAddress("ping")
-          .setConsumer(consumerId.get())
+          .setConsumerId(consumerId.get())
           .build();
 
         grpcClient.unsubscribe(unsubRequest).onComplete(context.asyncAssertSuccess(unsubResponse -> async.complete()));

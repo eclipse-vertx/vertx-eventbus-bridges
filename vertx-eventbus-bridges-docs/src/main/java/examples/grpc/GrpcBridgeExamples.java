@@ -141,7 +141,7 @@ public class GrpcBridgeExamples {
         // Set a handler for incoming messages
         stream.handler(message -> {
           // Store the consumer ID for later unsubscribing
-          String consumerId = message.getConsumer();
+          String consumerId = message.getConsumerId();
 
           // Convert Protobuf Struct to JsonObject
           JsonObject messageBody = structToJson(message.getBody());
@@ -166,8 +166,7 @@ public class GrpcBridgeExamples {
   public void unsubscribeFromMessages(EventBusBridgeGrpcClient grpcClient, String consumerId) {
     // Create the unsubscribe request with the consumer ID received during subscription
     UnsubscribeOp request = UnsubscribeOp.newBuilder()
-      .setAddress("news")
-      .setConsumer(consumerId)  // The consumer ID received in the subscription
+      .setConsumerId(consumerId)  // The consumer ID received in the subscription
       .build();
 
     // Unsubscribe

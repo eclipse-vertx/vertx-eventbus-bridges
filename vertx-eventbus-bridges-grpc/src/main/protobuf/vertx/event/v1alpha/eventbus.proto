@@ -22,6 +22,10 @@ service EventBusBridge {
   rpc Request(RequestOp) returns (EventBusMessage) {}
 
   // Subscribe to messages from an address
+  // The server will forward any message received on the event-bus address
+  // To unsubscribe the Unsubscribe rpc should be called with the consumer I
+  // The consumer ID is provided in the response headers as vertx-event-bus-consumer-id and in
+  // each of the received messages
   rpc Subscribe(SubscribeOp) returns (stream EventBusMessage) {}
 
   // Unsubscribe from an address
@@ -87,14 +91,11 @@ message SubscribeOp {
   // The address to subscribe to
   string address = 1;
 
-  // Consumer for subscription management
-  string consumer = 2;
-
   // Message headers
-  map<string, string> headers = 3;
+  map<string, string> headers = 2;
 
   // The desired format of the message body sent by the bridge
-  JsonValueFormat message_body_format = 4;
+  JsonValueFormat message_body_format = 3;
 }
 
 // Message used for unsubscribing from an address
@@ -102,8 +103,8 @@ message UnsubscribeOp {
   // The address to unsubscribe from
   string address = 1;
 
-  // Consumer for subscription management
-  string consumer = 2;
+  // The consumer ID for subscription management
+  string consumer_id = 2;
 }
 
 // Message received from the event bus
@@ -111,8 +112,8 @@ message EventBusMessage {
   // The address the message was sent to
   string address = 1;
 
-  // Consumer for subscription management
-  string consumer = 2;
+  // The consumer ID for subscription management
+  string consumer_id = 2;
 
   // Optional reply address
   string reply_address = 3;

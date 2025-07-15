@@ -31,7 +31,7 @@ public class EventBusBridgeUnsubscribeHandler extends EventBusBridgeHandlerBase<
   public void handle(GrpcServerRequest<UnsubscribeOp, Empty> request) {
     request.handler(eventRequest -> {
       String address = eventRequest.getAddress();
-      String consumerId = eventRequest.getConsumer();
+      String consumerId = eventRequest.getConsumerId();
 
       if (address.isEmpty()) {
         replyStatus(request, GrpcStatus.INVALID_ARGUMENT, "Invalid address");
@@ -76,8 +76,8 @@ public class EventBusBridgeUnsubscribeHandler extends EventBusBridgeHandlerBase<
     }
 
     // Add consumer ID if present
-    if (!request.getConsumer().isEmpty()) {
-      event.put("consumer", request.getConsumer());
+    if (!request.getConsumerId().isEmpty()) {
+      event.put("consumer", request.getConsumerId());
     }
 
     return event;
