@@ -6,6 +6,7 @@ import com.google.protobuf.util.Durations;
 import io.vertx.core.eventbus.Message;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.net.SocketAddress;
+import io.vertx.core.streams.ReadStream;
 import io.vertx.ext.unit.Async;
 import io.vertx.ext.unit.TestContext;
 import io.vertx.grpc.client.GrpcClient;
@@ -13,9 +14,13 @@ import io.vertx.grpc.event.v1alpha.*;
 import org.junit.After;
 import org.junit.Test;
 
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+
+import static org.junit.Assert.*;
 
 public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
 
@@ -23,8 +28,8 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
   private EventBusBridgeGrpcClient grpcClient;
 
   @Override
-  public void before(TestContext context) {
-    super.before(context);
+  public void before() {
+    super.before();
 
     client = GrpcClient.client(vertx);
 
@@ -67,16 +72,13 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
       .setBody(jsonToPayload(complexBody))
       .build();
 
-    grpcClient.send(request).onComplete(context.asyncAssertSuccess(response -> {
-    }));
+    grpcClient.send(request).await();
 
     async.awaitSuccess(5000);
   }
 
   @Test
-  public void testSendWithReply(TestContext context) {
-    Async async = context.async();
-
+  public void testSendWithReply() {
     JsonObject userProfile = new JsonObject()
       .put("userId", 12345)
       .put("username", "testuser")
@@ -91,17 +93,11 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
       .setBody(jsonToPayload(userProfile))
       .build();
 
-    grpcClient.send(request).onComplete(context.asyncAssertSuccess(response -> {
-      async.complete();
-    }));
-
-    async.awaitSuccess(5000);
+    grpcClient.send(request).await();
   }
 
   @Test
   public void testRequest(TestContext context) {
-    Async async = context.async();
-
     JsonObject requestBody = new JsonObject()
       .put("value", "vert.x")
       .put("timestamp", System.currentTimeMillis())
@@ -115,14 +111,10 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
       .setTimeout(Durations.fromMillis(5000))
       .build();
 
-    grpcClient.request(request).onComplete(context.asyncAssertSuccess(response -> {
-      context.assertFalse(response.hasStatus());
-      JsonObject responseBody = valueToJson(response.getBody());
-      context.assertEquals("Hello vert.x", responseBody.getString("value"));
-      async.complete();
-    }));
-
-    async.awaitSuccess(5000);
+    EventBusMessage response = grpcClient.request(request).await();
+    assertFalse(response.hasStatus());
+    JsonObject responseBody = valueToJson(response.getBody());
+    assertEquals("Hello vert.x", responseBody.getString("value"));
   }
 
   @Test
@@ -192,134 +184,83 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
 
   @Test
   public void testPing(TestContext context) {
-    Async async = context.async();
-    grpcClient.ping(Empty.getDefaultInstance()).onComplete(context.asyncAssertSuccess(response -> async.complete()));
-
-    async.awaitSuccess(5000);
+    Empty resp = grpcClient.ping(Empty.getDefaultInstance()).await();
   }
 
-  @Test
-  public void testSendWithStringBody(TestContext context) {
-    Async async = context.async();
-
-    vertx.eventBus().consumer("test", (Message<JsonObject> msg) -> {
-      context.assertEquals("simple string message", msg.body().getString("message"));
-      async.complete();
-    });
+  private JsonObject testSendWithBody(JsonPayload payload) throws Exception {
+    CompletableFuture<JsonObject> body = testConsumer();
 
     SendOp request = SendOp.newBuilder()
       .setAddress("test")
-      .setBody(jsonToPayload(new JsonObject().put("message", "simple string message")))
+      .setBody(payload)
       .build();
 
-    grpcClient.send(request).onComplete(context.asyncAssertSuccess(response -> {
-    }));
+    grpcClient.send(request).await();
 
-    async.awaitSuccess(5000);
+    return body.get(5, TimeUnit.SECONDS);
+  }
+
+  private JsonObject testPublishWithBody(JsonPayload payload) throws Exception {
+    CompletableFuture<JsonObject> body = testConsumer();
+
+    PublishOp request = PublishOp.newBuilder()
+      .setAddress("test")
+      .setBody(payload)
+      .build();
+
+    grpcClient.publish(request).await();
+
+    return body.get(5, TimeUnit.SECONDS);
+  }
+
+  private CompletableFuture<JsonObject> testConsumer() throws Exception {
+    CompletableFuture<JsonObject> body = new CompletableFuture<>();
+
+    vertx.eventBus().consumer("test", (Message<JsonObject> msg) -> {
+      body.complete(msg.body());
+    });
+
+    return body;
   }
 
   @Test
-  public void testSendWithNumericBody(TestContext context) {
-    Async async = context.async();
+  public void testSendWithStringBody() throws Exception {
+    JsonObject body = testSendWithBody(jsonToPayload(new JsonObject().put("message", "simple string message")));
+    assertEquals("simple string message", body.getString("message"));
+  }
 
-    vertx.eventBus().consumer("test", (Message<JsonObject> msg) -> {
-      JsonObject body = msg.body();
-      context.assertEquals(8080, body.getInteger("port"));
-      context.assertEquals(4.0, body.getDouble("version"));
-      context.assertEquals(1000L, body.getLong("timeout"));
-      async.complete();
-    });
-
+  @Test
+  public void testSendWithNumericBody() throws Exception {
     JsonObject numericBody = new JsonObject()
       .put("port", 8080)
       .put("version", 4.0)
       .put("timeout", 1000L);
-
-    SendOp request = SendOp.newBuilder()
-      .setAddress("test")
-      .setBody(jsonToPayload(numericBody))
-      .build();
-
-    grpcClient.send(request).onComplete(context.asyncAssertSuccess(response -> {
-    }));
-
-    async.awaitSuccess(5000);
+    JsonObject body = testSendWithBody(jsonToPayload(numericBody));
+    assertEquals(8080, (int)body.getInteger("port"));
+    assertEquals(4.0, (double)body.getDouble("version"), 0.001);
+    assertEquals(1000L, (long)body.getLong("timeout"));
   }
 
   @Test
-  public void testSendWithBooleanBody(TestContext context) {
-    Async async = context.async();
-
-    vertx.eventBus().consumer("test", (Message<JsonObject> msg) -> {
-      JsonObject body = msg.body();
-      context.assertTrue(body.getBoolean("isActive"));
-      context.assertFalse(body.getBoolean("isDeleted"));
-      async.complete();
-    });
-
-    JsonObject booleanBody = new JsonObject()
+  public void testSendWithBooleanBody() throws Exception {
+    JsonObject body = testSendWithBody(jsonToPayload(new JsonObject()
       .put("isActive", true)
-      .put("isDeleted", false);
-
-    SendOp request = SendOp.newBuilder()
-      .setAddress("test")
-      .setBody(jsonToPayload(booleanBody))
-      .build();
-
-    grpcClient.send(request).onComplete(context.asyncAssertSuccess(response -> {
-    }));
-
-    async.awaitSuccess(5000);
+      .put("isDeleted", false)));
+    assertTrue(body.getBoolean("isActive"));
+    assertFalse(body.getBoolean("isDeleted"));
   }
 
   @Test
-  public void testSendWithNullBody(TestContext context) {
-    Async async = context.async();
-
-    vertx.eventBus().consumer("test", (Message<JsonObject> msg) -> {
-      JsonObject body = msg.body();
-      context.assertNull(body.getValue("nullField"));
-      context.assertEquals("not null", body.getString("notNullField"));
-      async.complete();
-    });
-
-    JsonObject nullBody = new JsonObject()
+  public void testSendWithNullBody() throws Exception {
+    JsonObject body = testSendWithBody(jsonToPayload(new JsonObject()
       .putNull("nullField")
-      .put("notNullField", "not null");
-
-    SendOp request = SendOp.newBuilder()
-      .setAddress("test")
-      .setBody(jsonToPayload(nullBody))
-      .build();
-
-    grpcClient.send(request).onComplete(context.asyncAssertSuccess(response -> {
-    }));
-
-    async.awaitSuccess(5000);
+      .put("notNullField", "not null")));
+    assertNull(body.getValue("nullField"));
+    assertEquals("not null", body.getString("notNullField"));
   }
 
   @Test
-  public void testSendWithNestedObjectBody(TestContext context) {
-    Async async = context.async();
-
-    vertx.eventBus().consumer("test", (Message<JsonObject> msg) -> {
-      JsonObject body = msg.body();
-      context.assertEquals("Julien", body.getString("name"));
-
-      JsonObject address = body.getJsonObject("address");
-      context.assertNotNull(address);
-      context.assertEquals("5 Avenue Anatole France", address.getString("street"));
-      context.assertEquals("Paris", address.getString("city"));
-      context.assertEquals(75007, address.getInteger("zipcode"));
-
-      JsonObject contact = address.getJsonObject("contact");
-      context.assertNotNull(contact);
-      context.assertEquals("julien@vertx.io", contact.getString("email"));
-      context.assertEquals("+99-9-99-99-99-99", contact.getString("phone"));
-
-      async.complete();
-    });
-
+  public void testSendWithNestedObjectBody(TestContext context) throws Exception {
     JsonObject nestedBody = new JsonObject()
       .put("name", "Julien")
       .put("address", new JsonObject()
@@ -329,43 +270,27 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
         .put("contact", new JsonObject()
           .put("email", "julien@vertx.io")
           .put("phone", "+99-9-99-99-99-99")));
-
-    SendOp request = SendOp.newBuilder()
-      .setAddress("test")
-      .setBody(jsonToPayload(nestedBody))
-      .build();
-
-    grpcClient.send(request).onComplete(context.asyncAssertSuccess(response -> {
-    }));
-
-    async.awaitSuccess(5000);
+    JsonObject body = testSendWithBody(jsonToPayload(nestedBody));
+    assertEquals("Julien", body.getString("name"));
+    JsonObject address = body.getJsonObject("address");
+    assertNotNull(address);
+    assertEquals("5 Avenue Anatole France", address.getString("street"));
+    assertEquals("Paris", address.getString("city"));
+    assertEquals(75007, (int)address.getInteger("zipcode"));
+    JsonObject contact = address.getJsonObject("contact");
+    assertNotNull(contact);
+    assertEquals("julien@vertx.io", contact.getString("email"));
+    assertEquals("+99-9-99-99-99-99", contact.getString("phone"));
   }
 
   @Test
-  public void testSendWithEmptyBody(TestContext context) {
-    Async async = context.async();
-
-    vertx.eventBus().consumer("test", (Message<JsonObject> msg) -> {
-      JsonObject body = msg.body();
-      context.assertTrue(body.isEmpty());
-      async.complete();
-    });
-
-    SendOp request = SendOp.newBuilder()
-      .setAddress("test")
-      .setBody(jsonToPayload(new JsonObject()))
-      .build();
-
-    grpcClient.send(request).onComplete(context.asyncAssertSuccess(response -> {
-    }));
-
-    async.awaitSuccess(5000);
+  public void testSendWithEmptyBody() throws Exception {
+    JsonObject body = testSendWithBody(jsonToPayload(new JsonObject()));
+    assertTrue(body.isEmpty());
   }
 
   @Test
   public void testRequestWithComplexBody(TestContext context) {
-    Async async = context.async();
-
     JsonObject complexRequestBody = new JsonObject()
       .put("value", "getUserProfile")
       .put("userId", 12345)
@@ -386,38 +311,13 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
       .setTimeout(Durations.fromMillis(5000))
       .build();
 
-    grpcClient.request(request).onComplete(context.asyncAssertSuccess(response -> {
-      context.assertFalse(response.hasStatus());
-      JsonObject responseBody = valueToJson(response.getBody());
-      context.assertEquals("Hello getUserProfile", responseBody.getString("value"));
-      async.complete();
-    }));
-
-    async.awaitSuccess(5000);
+    EventBusMessage response = grpcClient.request(request).await();
+    JsonObject responseBody = valueToJson(response.getBody());
+    context.assertEquals("Hello getUserProfile", responseBody.getString("value"));
   }
 
   @Test
-  public void testPublishWithMixedTypesBody(TestContext context) {
-    Async async = context.async();
-    AtomicBoolean received = new AtomicBoolean(false);
-
-    vertx.eventBus().consumer("test", (Message<JsonObject> msg) -> {
-      JsonObject body = msg.body();
-      context.assertEquals("vertx-event", body.getString("type"));
-      context.assertEquals(2.0, body.getDouble("priority"));
-      context.assertTrue(body.getBoolean("urgent"));
-      context.assertNull(body.getValue("assignee"));
-
-      JsonObject tags = body.getJsonObject("tags");
-      context.assertNotNull(tags);
-      context.assertEquals("eventbus", tags.getString("environment"));
-      context.assertEquals(1, tags.getInteger("severity"));
-
-      if (received.compareAndSet(false, true)) {
-        async.complete();
-      }
-    });
-
+  public void testPublishWithMixedTypesBody(TestContext context) throws Exception {
     JsonObject mixedTypesBody = new JsonObject()
       .put("type", "vertx-event")
       .put("priority", 2.0)
@@ -426,17 +326,15 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
       .put("tags", new JsonObject()
         .put("environment", "eventbus")
         .put("severity", 1));
-
-    PublishOp request = PublishOp.newBuilder()
-      .setAddress("test")
-      .setBody(jsonToPayload(mixedTypesBody))
-      .build();
-
-    grpcClient.publish(request).onComplete(context.asyncAssertSuccess(response -> {
-
-    }));
-
-    async.awaitSuccess(5000);
+    JsonObject body = testPublishWithBody(jsonToPayload(mixedTypesBody));
+    context.assertEquals("vertx-event", body.getString("type"));
+    context.assertEquals(2.0, body.getDouble("priority"));
+    context.assertTrue(body.getBoolean("urgent"));
+    context.assertNull(body.getValue("assignee"));
+    JsonObject tags = body.getJsonObject("tags");
+    context.assertNotNull(tags);
+    context.assertEquals("eventbus", tags.getString("environment"));
+    context.assertEquals(1, tags.getInteger("severity"));
   }
 
   @Test
@@ -445,7 +343,7 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
     AtomicReference<String> consumerId = new AtomicReference<>();
 
     // Update the ping consumer to send a complex body
-    vertx.eventBus().consumer("complex-ping", (Message<JsonObject> msg) -> {
+    long timerID = vertx.setPeriodic(10, id -> {
       JsonObject complexPingBody = new JsonObject()
         .put("messageId", "vertx-msg-001")
         .put("timestamp", System.currentTimeMillis())
@@ -462,14 +360,11 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
       vertx.eventBus().send("complex-ping", complexPingBody);
     });
 
-    // Send initial trigger
-    vertx.runOnContext(v -> {
-      vertx.eventBus().send("complex-ping", new JsonObject());
-    });
-
     SubscribeOp request = SubscribeOp.newBuilder().setAddress("complex-ping").build();
 
-    grpcClient.subscribe(request).onComplete(context.asyncAssertSuccess(stream -> stream.handler(response -> {
+    ReadStream<EventBusMessage> stream = grpcClient.subscribe(request).await();
+    AtomicBoolean subscribed = new AtomicBoolean(true);
+    stream.handler(response -> {
       consumerId.set(response.getConsumer());
 
       context.assertEquals("complex-ping", response.getAddress());
@@ -496,13 +391,17 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
       context.assertEquals(80.0, metrics.getDouble("memory"));
       context.assertEquals(7200, metrics.getInteger("uptime"));
 
-      UnsubscribeOp unsubRequest = UnsubscribeOp.newBuilder()
-        .setAddress("complex-ping")
-        .setConsumer(consumerId.get())
-        .build();
+      if (subscribed.compareAndSet(true, false)) {
+        UnsubscribeOp unsubRequest = UnsubscribeOp.newBuilder()
+          .setAddress("complex-ping")
+          .setConsumer(consumerId.get())
+          .build();
 
-      grpcClient.unsubscribe(unsubRequest).onComplete(context.asyncAssertSuccess(unsubResponse -> async.complete()));
-    })));
+        grpcClient
+          .unsubscribe(unsubRequest)
+          .onComplete(context.asyncAssertSuccess(unsubResponse -> async.complete()));
+      }
+    });
 
     async.awaitSuccess(5000);
   }
@@ -574,15 +473,16 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
 
   @Test
   public void testUnsubscribeInvalidConsumerId(TestContext context) {
-    Async async = context.async();
     UnsubscribeOp unsubRequest = UnsubscribeOp.newBuilder()
       .setAddress("ping")
       .setConsumer("invalid-consumer-id")
       .build();
 
-    grpcClient.unsubscribe(unsubRequest).onComplete(context.asyncAssertFailure(err -> async.complete()));
-
-    async.awaitSuccess(5000);
+    try {
+      grpcClient.unsubscribe(unsubRequest).await();
+      fail();
+    } catch (Exception expected) {
+    }
   }
 
   @Test

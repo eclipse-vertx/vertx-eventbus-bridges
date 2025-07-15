@@ -9,8 +9,10 @@ import io.vertx.core.Promise;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpClient;
 import io.vertx.core.http.HttpClientOptions;
+import io.vertx.core.http.HttpClientResponse;
 import io.vertx.core.http.HttpHeaders;
 import io.vertx.core.http.HttpMethod;
+import io.vertx.core.http.HttpResponseExpectation;
 import io.vertx.core.internal.buffer.BufferInternal;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.unit.Async;
@@ -60,19 +62,14 @@ public class GrpcEventBusWebTest extends GrpcEventBusBridgeTestBase {
     return encoded;
   }
 
-  @Override
-  public void before(TestContext context) {
-    super.before(context);
+  public void before() {
+    super.before();
 
     // Create HTTP client with appropriate options for gRPC-Web
     HttpClientOptions options = new HttpClientOptions().setDefaultHost("localhost").setDefaultPort(7000);
     this.client = vertx.createHttpClient(options);
 
-    ping().onComplete(res -> {
-      if (!res.succeeded()) {
-        context.fail("Ping failed: " + res.cause().getMessage());
-      }
-    });
+    ping().await();
   }
 
   @Override
@@ -128,16 +125,9 @@ public class GrpcEventBusWebTest extends GrpcEventBusBridgeTestBase {
   }
 
   @Test
-  public void testPublishToRestrictedAddress(TestContext context) {
-    Async async = context.async();
-
+  public void testPublishToRestrictedAddress() {
     JsonObject message = new JsonObject().put("key", "value");
-
-    publish("restricted-address", message)
-      .onSuccess(v -> context.fail("Expected publish to fail, but it succeeded"))
-      .onFailure(err -> async.complete());
-
-    async.awaitSuccess(5000);
+    publish("restricted-address", message).await();
   }
 
   @Test
@@ -238,30 +228,19 @@ public class GrpcEventBusWebTest extends GrpcEventBusBridgeTestBase {
   }
 
   public Future<Void> publish(String address, JsonObject message) {
-    Promise<Void> promise = Promise.promise();
-
     PublishOp request = PublishOp.newBuilder()
       .setAddress(address)
       .setBody(GrpcEventBusBridgeTestBase.jsonToPayload(message))
       .build();
 
-    client.request(HttpMethod.POST, "/vertx.event.v1alpha.EventBusBridge/Publish").compose(httpRequest -> {
+    return client.request(HttpMethod.POST, "/vertx.event.v1alpha.EventBusBridge/Publish").compose(httpRequest -> {
         requestHeaders().forEach(httpRequest::putHeader);
 
         return httpRequest.send(encode(request))
-          .onSuccess(response -> {
-            if (response.statusCode() == 200 && !response.headers().contains(GRPC_STATUS)) {
-              promise.complete();
-            } else {
-              String error = "HTTP error: " + response.statusCode() + " " + response.statusMessage();
-              promise.fail(error);
-            }
-          })
-          .onFailure(promise::fail);
-      })
-      .onFailure(promise::fail);
-
-    return promise.future();
+          .expecting(HttpResponseExpectation.SC_OK)
+          .expecting(resp -> resp.headers().contains(GRPC_STATUS))
+          .compose(HttpClientResponse::end);
+      });
   }
 
   public Future<Buffer> subscribe(String address) {

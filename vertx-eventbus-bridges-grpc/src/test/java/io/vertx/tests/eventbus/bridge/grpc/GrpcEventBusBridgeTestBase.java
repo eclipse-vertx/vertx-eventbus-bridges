@@ -66,10 +66,8 @@ public abstract class GrpcEventBusBridgeTestBase {
   }
 
   @Before
-  public void before(TestContext context) {
+  public void before() {
     vertx = Vertx.vertx();
-
-    Async async = context.async();
 
     vertx.eventBus().consumer("hello", (Message<JsonObject> msg) -> msg.reply(new JsonObject().put("value", "Hello " + msg.body().getString("value"))));
     vertx.eventBus().consumer("echo", (Message<JsonObject> msg) -> msg.reply(msg.body()));
@@ -89,10 +87,7 @@ public abstract class GrpcEventBusBridgeTestBase {
       7000,
       event -> eventHandler.handle(event));
 
-    bridge.listen().onComplete(res -> {
-      context.assertTrue(res.succeeded());
-      async.complete();
-    });
+    bridge.listen().await();
   }
 
   @After
