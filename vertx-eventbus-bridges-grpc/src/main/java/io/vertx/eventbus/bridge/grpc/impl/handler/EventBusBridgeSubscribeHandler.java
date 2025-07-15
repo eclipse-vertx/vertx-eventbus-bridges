@@ -1,6 +1,5 @@
 package io.vertx.eventbus.bridge.grpc.impl.handler;
 
-import com.google.protobuf.Value;
 import io.vertx.core.Handler;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.eventbus.Message;
@@ -12,8 +11,8 @@ import io.vertx.ext.bridge.BridgeEventType;
 import io.vertx.ext.bridge.BridgeOptions;
 import io.vertx.grpc.common.*;
 import io.vertx.grpc.event.v1alpha.EventBusMessage;
-import io.vertx.grpc.event.v1alpha.JsonPayload;
-import io.vertx.grpc.event.v1alpha.JsonPayloadType;
+import io.vertx.grpc.event.v1alpha.JsonValue;
+import io.vertx.grpc.event.v1alpha.JsonValueFormat;
 import io.vertx.grpc.event.v1alpha.SubscribeOp;
 import io.vertx.grpc.server.GrpcServerRequest;
 
@@ -58,7 +57,7 @@ public class EventBusBridgeSubscribeHandler extends EventBusBridgeHandlerBase<Su
           requests.put(consumerId, request);
 
           MessageConsumer<Object> consumer = bus.consumer(address,
-            new BridgeMessageConsumer(request, address, consumerId, eventRequest.getBodyType()));
+            new BridgeMessageConsumer(request, address, consumerId, eventRequest.getMessageBodyFormat()));
 
           Map<String, MessageConsumer<?>> addressConsumers = consumers.computeIfAbsent(address, k -> new ConcurrentHashMap<>());
           addressConsumers.put(consumerId, consumer);
@@ -101,14 +100,14 @@ public class EventBusBridgeSubscribeHandler extends EventBusBridgeHandlerBase<Su
     private final GrpcServerRequest<SubscribeOp, EventBusMessage> request;
     private final String address;
     private final String consumerId;
-    private final JsonPayloadType bodyType;
+    private final JsonValueFormat jsonValueFormat;
 
     BridgeMessageConsumer(GrpcServerRequest<SubscribeOp, EventBusMessage> request, String address,
-                          String consumerId, JsonPayloadType bodyType) {
+                          String consumerId, JsonValueFormat jsonValueFormat) {
       this.request = request;
       this.address = address;
       this.consumerId = consumerId;
-      this.bodyType = bodyType;
+      this.jsonValueFormat = jsonValueFormat;
     }
 
     @Override
@@ -118,13 +117,13 @@ public class EventBusBridgeSubscribeHandler extends EventBusBridgeHandlerBase<Su
         responseHeaders.put(entry.getKey(), entry.getValue());
       }
 
-      JsonPayload body;
+      JsonValue body;
       if (message.body() instanceof JsonObject) {
-        body = jsonToProto((JsonObject) message.body(), bodyType);
+        body = jsonToProto((JsonObject) message.body(), jsonValueFormat);
       } else if (message.body() instanceof String) {
-        body = jsonToProto(new JsonObject(String.valueOf(message.body())), bodyType);
+        body = jsonToProto(new JsonObject(String.valueOf(message.body())), jsonValueFormat);
       } else {
-        body = jsonToProto(new JsonObject().put("value", String.valueOf(message.body())), bodyType);
+        body = jsonToProto(new JsonObject().put("value", String.valueOf(message.body())), jsonValueFormat);
       }
 
       EventBusMessage response = EventBusMessage.newBuilder()

@@ -16,8 +16,8 @@ import io.vertx.ext.bridge.PermittedOptions;
 import io.vertx.ext.unit.Async;
 import io.vertx.ext.unit.TestContext;
 import io.vertx.ext.unit.junit.VertxUnitRunner;
-import io.vertx.grpc.event.v1alpha.JsonPayload;
-import io.vertx.grpc.event.v1alpha.JsonPayloadType;
+import io.vertx.grpc.event.v1alpha.JsonValue;
+import io.vertx.grpc.event.v1alpha.JsonValueFormat;
 import junit.framework.AssertionFailedError;
 import org.junit.After;
 import org.junit.Before;
@@ -33,14 +33,14 @@ public abstract class GrpcEventBusBridgeTestBase {
   /**
    * Convert a Json value to a JsonPayload
    */
-  public static JsonPayload jsonToPayload(Object json) {
-    return jsonToPayload(json , JsonPayloadType.proto);
+  public static JsonValue jsonToPayload(Object json) {
+    return jsonToPayload(json , JsonValueFormat.proto);
   }
 
   /**
    * Convert a JsonObject to a JsonPayload
    */
-  public static JsonPayload jsonToPayload(Object json, JsonPayloadType type) {
+  public static JsonValue jsonToPayload(Object json, JsonValueFormat type) {
     switch (type) {
       case proto:
         Value.Builder valueBuilder = Value.newBuilder();
@@ -51,16 +51,16 @@ public abstract class GrpcEventBusBridgeTestBase {
           afe.initCause(e);
           throw afe;
         }
-        return JsonPayload.newBuilder()
-          .setProtoBody(valueBuilder.build())
+        return JsonValue.newBuilder()
+          .setProto(valueBuilder.build())
           .build();
       case binary:
-        return JsonPayload.newBuilder()
-          .setBinaryBody(ByteString.copyFrom(Json.encodeToBuffer(json).getBytes()))
+        return JsonValue.newBuilder()
+          .setBinary(ByteString.copyFrom(Json.encodeToBuffer(json).getBytes()))
           .build();
       case text:
-        return JsonPayload.newBuilder()
-          .setTextBody(Json.encode(json))
+        return JsonValue.newBuilder()
+          .setText(Json.encode(json))
           .build();
       default:
         throw new UnsupportedOperationException();
@@ -68,14 +68,14 @@ public abstract class GrpcEventBusBridgeTestBase {
 
   }
 
-  public static JsonObject valueToJson(JsonPayload value) {
-    return valueToJson(value, JsonPayloadType.proto);
+  public static JsonObject valueToJson(JsonValue value) {
+    return valueToJson(value, JsonValueFormat.proto);
   }
 
   /**
    * Convert a Protobuf Value to a JsonObject
    */
-  public static JsonObject valueToJson(JsonPayload value, JsonPayloadType bodyType) {
+  public static JsonObject valueToJson(JsonValue value, JsonValueFormat bodyType) {
     if (value == null) {
       return new JsonObject();
     }
@@ -84,16 +84,16 @@ public abstract class GrpcEventBusBridgeTestBase {
       case proto:
         JsonObject json = new JsonObject();
         try {
-          String jsonString = JsonFormat.printer().print(value.getProtoBody());
+          String jsonString = JsonFormat.printer().print(value.getProto());
           json = new JsonObject(jsonString);
         } catch (Exception e) {
           // If parsing fails, return empty object
         }
         return json;
       case binary:
-        return new JsonObject(Buffer.buffer(value.getBinaryBody().toByteArray()));
+        return new JsonObject(Buffer.buffer(value.getBinary().toByteArray()));
       case text:
-        return new JsonObject(value.getTextBody());
+        return new JsonObject(value.getText());
       default:
         throw new UnsupportedOperationException();
     }

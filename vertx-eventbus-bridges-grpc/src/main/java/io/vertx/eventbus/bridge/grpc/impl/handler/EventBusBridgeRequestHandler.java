@@ -1,6 +1,5 @@
 package io.vertx.eventbus.bridge.grpc.impl.handler;
 
-import com.google.protobuf.Value;
 import com.google.protobuf.util.Durations;
 import io.vertx.core.Handler;
 import io.vertx.core.eventbus.DeliveryOptions;
@@ -12,8 +11,8 @@ import io.vertx.ext.bridge.BridgeEventType;
 import io.vertx.ext.bridge.BridgeOptions;
 import io.vertx.grpc.common.*;
 import io.vertx.grpc.event.v1alpha.EventBusMessage;
-import io.vertx.grpc.event.v1alpha.JsonPayload;
-import io.vertx.grpc.event.v1alpha.JsonPayloadType;
+import io.vertx.grpc.event.v1alpha.JsonValue;
+import io.vertx.grpc.event.v1alpha.JsonValueFormat;
 import io.vertx.grpc.event.v1alpha.RequestOp;
 import io.vertx.grpc.server.GrpcServerRequest;
 
@@ -66,8 +65,8 @@ public class EventBusBridgeRequestHandler extends EventBusBridgeHandlerBase<Requ
                 responseHeaders.put(entry.getKey(), entry.getValue());
               }
 
-              JsonPayloadType replyBodyType = eventRequest.getReplyBodyType();
-              JsonPayload replyBody;
+              JsonValueFormat replyBodyType = eventRequest.getReplyBodyFormat();
+              JsonValue replyBody;
 
               if (reply.body() instanceof JsonObject) {
                 replyBody = jsonToProto((JsonObject) reply.body(), replyBodyType);

@@ -18,8 +18,8 @@ import io.vertx.ext.bridge.BridgeOptions;
 import io.vertx.ext.bridge.PermittedOptions;
 import io.vertx.grpc.common.GrpcStatus;
 import io.vertx.grpc.event.v1alpha.EventBusMessage;
-import io.vertx.grpc.event.v1alpha.JsonPayload;
-import io.vertx.grpc.event.v1alpha.JsonPayloadType;
+import io.vertx.grpc.event.v1alpha.JsonValue;
+import io.vertx.grpc.event.v1alpha.JsonValueFormat;
 import io.vertx.grpc.event.v1alpha.SubscribeOp;
 import io.vertx.grpc.server.GrpcServerRequest;
 
@@ -57,29 +57,29 @@ public abstract class EventBusBridgeHandlerBase<Req, Resp> implements Handler<Gr
    *
    * This method uses the Protocol Buffers JSON format to convert the message to a JSON string, then parses that string into a Vert.x JsonObject.
    *
-   * @param payload a {@link JsonPayload} to convert
+   * @param payload a {@link JsonValue} to convert
    * @return a JSON object representing the message
    */
-  protected static Object protoToJson(JsonPayload payload) {
+  protected static Object protoToJson(JsonValue payload) {
     if (payload == null) {
       return new JsonObject();
     }
 
-    switch (payload.getBodyCase()) {
-      case TEXT_BODY:
-        return Json.decodeValue(payload.getTextBody());
-      case BINARY_BODY:
-        return Json.decodeValue(Buffer.buffer(payload.getBinaryBody().toByteArray()));
-      case PROTO_BODY: {
+    switch (payload.getValueCase()) {
+      case TEXT:
+        return Json.decodeValue(payload.getText());
+      case BINARY:
+        return Json.decodeValue(Buffer.buffer(payload.getBinary().toByteArray()));
+      case PROTO: {
         try {
-          String jsonString = JsonFormat.printer().print(payload.getProtoBody());
+          String jsonString = JsonFormat.printer().print(payload.getProto());
           return Json.decodeValue(jsonString);
         } catch (Exception ignored) {
           throw new UnsupportedOperationException("Handle me");
         }
       }
       default:
-        throw new IllegalArgumentException("Invalid payload body case: " + payload.getBodyCase());
+        throw new IllegalArgumentException("Invalid payload body case: " + payload.getValueCase());
     }
   }
 
@@ -91,8 +91,8 @@ public abstract class EventBusBridgeHandlerBase<Req, Resp> implements Handler<Gr
    * @param json the JSON object to convert
    * @return a Protocol Buffers message representing the JSON object
    */
-  public static JsonPayload jsonToProto(JsonObject json, JsonPayloadType payloadType) {
-    JsonPayload.Builder payloadBuilder = JsonPayload.newBuilder();
+  public static JsonValue jsonToProto(JsonObject json, JsonValueFormat payloadType) {
+    JsonValue.Builder payloadBuilder = JsonValue.newBuilder();
     switch (payloadType) {
       case proto:
         Value.Builder structBuilder = Value.newBuilder();
@@ -100,13 +100,13 @@ public abstract class EventBusBridgeHandlerBase<Req, Resp> implements Handler<Gr
           JsonFormat.parser().merge(json.encode(), structBuilder);
         } catch (Exception ignored) {
         }
-        payloadBuilder.setProtoBody(structBuilder);
+        payloadBuilder.setProto(structBuilder);
         break;
       case binary:
-        payloadBuilder.setBinaryBody(ByteString.copyFrom(json.toBuffer().getBytes()));
+        payloadBuilder.setBinary(ByteString.copyFrom(json.toBuffer().getBytes()));
         break;
       case text:
-        payloadBuilder.setTextBody(json.encode());
+        payloadBuilder.setText(json.encode());
         break;
     }
     return payloadBuilder.build();

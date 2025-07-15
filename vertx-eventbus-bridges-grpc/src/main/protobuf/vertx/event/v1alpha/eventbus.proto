@@ -40,7 +40,7 @@ message PublishOp {
   map<string, string> headers = 2;
 
   // Message payload
-  JsonPayload body = 3;
+  JsonValue body = 3;
 }
 
 // Message used for sending to an address (point-to-point)
@@ -55,7 +55,7 @@ message SendOp {
   map<string, string> headers = 3;
 
   // Message payload
-  JsonPayload body = 4;
+  JsonValue body = 4;
 
   // Timeout in milliseconds
   google.protobuf.Duration timeout = 5;
@@ -73,10 +73,10 @@ message RequestOp {
   map<string, string> headers = 3;
 
   // Message payload
-  JsonPayload body = 4;
+  JsonValue body = 4;
 
-  // The desired type of the reply body
-  JsonPayloadType replyBodyType = 5;
+  // The desired format of the reply body
+  JsonValueFormat reply_body_format = 5;
 
   // Timeout in milliseconds
   google.protobuf.Duration timeout = 6;
@@ -93,8 +93,8 @@ message SubscribeOp {
   // Message headers
   map<string, string> headers = 3;
 
-  // The desired type of the body sent by the bridge
-  JsonPayloadType body_type = 4;
+  // The desired format of the message body sent by the bridge
+  JsonValueFormat message_body_format = 4;
 }
 
 // Message used for unsubscribing from an address
@@ -121,13 +121,13 @@ message EventBusMessage {
   map<string, string> headers = 4;
 
   // Message payload
-  JsonPayload body = 5;
+  JsonValue body = 5;
 
   // Optional status for error responses
   google.rpc.Status status = 6;
 }
 
-enum JsonPayloadType {
+enum JsonValueFormat {
   // google.protobuf.Value (default)
   proto = 0;
   // protobuf encoded json string encoded as a byte array
@@ -136,10 +136,10 @@ enum JsonPayloadType {
   text = 2;
 }
 
-message JsonPayload {
-  oneof body {
-    google.protobuf.Value proto_body = 1;
-    bytes binary_body = 2;
-    string text_body = 3;
+message JsonValue {
+  oneof value {
+    google.protobuf.Value proto = 1;
+    bytes binary = 2;
+    string text = 3;
   }
 }

@@ -157,18 +157,18 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
 
   @Test
   public void testSubscribeWithProtoType(TestContext context) {
-    testSubscribe(context, JsonPayloadType.proto);
+    testSubscribe(context, JsonValueFormat.proto);
   }
 
   @Test
   public void testSubscribeWithBinaryType(TestContext context) {
-    testSubscribe(context, JsonPayloadType.binary);
+    testSubscribe(context, JsonValueFormat.binary);
   }
 
-  private void testSubscribe(TestContext context, JsonPayloadType bodyType) {
+  private void testSubscribe(TestContext context, JsonValueFormat format) {
     Async async = context.async();
     AtomicReference<String> consumerId = new AtomicReference<>();
-    SubscribeOp request = SubscribeOp.newBuilder().setAddress("ping").setBodyType(bodyType).build();
+    SubscribeOp request = SubscribeOp.newBuilder().setAddress("ping").setMessageBodyFormat(format).build();
 
     grpcClient.subscribe(request).onComplete(context.asyncAssertSuccess(stream -> stream.handler(response -> {
       consumerId.set(response.getConsumer());
@@ -176,8 +176,8 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
       context.assertEquals("ping", response.getAddress());
       context.assertNotNull(response.getBody());
 
-      JsonPayload body = response.getBody();
-      JsonObject jsonBody = valueToJson(body, bodyType);
+      JsonValue body = response.getBody();
+      JsonObject jsonBody = valueToJson(body, format);
       context.assertEquals("hi", jsonBody.getString("value"));
 
       UnsubscribeOp unsubRequest = UnsubscribeOp.newBuilder()
@@ -209,7 +209,7 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
     return body.get(5, TimeUnit.SECONDS);
   }
 
-  private JsonObject testPublishWithBody(JsonPayload payload) throws Exception {
+  private JsonObject testPublishWithBody(JsonValue payload) throws Exception {
     CompletableFuture<JsonObject> body = testConsumer();
 
     PublishOp request = PublishOp.newBuilder()
@@ -371,7 +371,7 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
       context.assertEquals("complex-ping", response.getAddress());
       context.assertNotNull(response.getBody());
 
-      JsonPayload body = response.getBody();
+      JsonValue body = response.getBody();
       JsonObject jsonBody = valueToJson(body);
 
       context.assertEquals("vertx-msg-001", jsonBody.getString("messageId"));
@@ -547,8 +547,8 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
       .put("type", "binary-data")
       .put("name", "Julien")
       .put("content", "vertx-binary-test");
-    JsonPayload binaryPayload = JsonPayload.newBuilder()
-      .setBinaryBody(com.google.protobuf.ByteString.copyFromUtf8(binaryContent.encode()))
+    JsonValue binaryPayload = JsonValue.newBuilder()
+      .setBinary(com.google.protobuf.ByteString.copyFromUtf8(binaryContent.encode()))
       .build();
 
     SendOp request = SendOp.newBuilder()
@@ -579,8 +579,8 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
       .put("type", "text-message")
       .put("author", "Julien")
       .put("message", "vertx-text-payload");
-    JsonPayload textPayload = JsonPayload.newBuilder()
-      .setTextBody(textContent.encode())
+    JsonValue textPayload = JsonValue.newBuilder()
+      .setText(textContent.encode())
       .build();
 
     SendOp request = SendOp.newBuilder()
@@ -602,8 +602,8 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
       .put("value", "getBinaryProfile")
       .put("userId", 9999)
       .put("format", "binary");
-    JsonPayload binaryPayload = JsonPayload.newBuilder()
-      .setBinaryBody(com.google.protobuf.ByteString.copyFromUtf8(binaryRequestContent.encode()))
+    JsonValue binaryPayload = JsonValue.newBuilder()
+      .setBinary(com.google.protobuf.ByteString.copyFromUtf8(binaryRequestContent.encode()))
       .build();
 
     RequestOp request = RequestOp.newBuilder()
@@ -630,8 +630,8 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
       .put("value", "getTextProfile")
       .put("userId", 8888)
       .put("format", "text");
-    JsonPayload textPayload = JsonPayload.newBuilder()
-      .setTextBody(textRequestContent.encode())
+    JsonValue textPayload = JsonValue.newBuilder()
+      .setText(textRequestContent.encode())
       .build();
 
     RequestOp request = RequestOp.newBuilder()
@@ -672,8 +672,8 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
       .put("sender", "Julien")
       .put("content", "vertx-binary-publish")
       .put("priority", 3);
-    JsonPayload binaryPayload = JsonPayload.newBuilder()
-      .setBinaryBody(com.google.protobuf.ByteString.copyFromUtf8(binaryNotificationContent.encode()))
+    JsonValue binaryPayload = JsonValue.newBuilder()
+      .setBinary(com.google.protobuf.ByteString.copyFromUtf8(binaryNotificationContent.encode()))
       .build();
 
     PublishOp request = PublishOp.newBuilder()
@@ -709,8 +709,8 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
       .put("author", "Julien")
       .put("message", "vertx-text-publish")
       .put("level", 1);
-    JsonPayload textPayload = JsonPayload.newBuilder()
-      .setTextBody(textNotificationContent.encode())
+    JsonValue textPayload = JsonValue.newBuilder()
+      .setText(textNotificationContent.encode())
       .build();
 
     PublishOp request = PublishOp.newBuilder()
@@ -743,7 +743,7 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
       context.assertEquals("ping", response.getAddress());
       context.assertNotNull(response.getBody());
 
-      JsonPayload body = response.getBody();
+      JsonValue body = response.getBody();
       JsonObject jsonBody = valueToJson(body);
       context.assertEquals("hi", jsonBody.getString("value"));
 

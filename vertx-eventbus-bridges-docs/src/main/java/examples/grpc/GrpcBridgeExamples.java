@@ -2,7 +2,6 @@ package examples.grpc;
 
 import com.google.protobuf.Duration;
 import com.google.protobuf.Empty;
-import com.google.protobuf.Struct;
 import com.google.protobuf.Value;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
@@ -59,7 +58,7 @@ public class GrpcBridgeExamples {
     JsonObject message = new JsonObject().put("value", "Hello from gRPC client");
 
     // Convert to Protobuf Struct
-    JsonPayload messageBody = toJsonPayload(message);
+    JsonValue messageBody = toJsonValue(message);
 
     // Create the request
     SendOp request = SendOp.newBuilder()
@@ -82,7 +81,7 @@ public class GrpcBridgeExamples {
     JsonObject message = new JsonObject().put("value", "Hello from gRPC client");
 
     // Convert to Protobuf Struct
-    JsonPayload messageBody = toJsonPayload(message);
+    JsonValue messageBody = toJsonValue(message);
 
     // Create the request with timeout
     RequestOp request = RequestOp.newBuilder()
@@ -109,7 +108,7 @@ public class GrpcBridgeExamples {
     JsonObject message = new JsonObject().put("value", "Broadcast message");
 
     // Convert to Protobuf Struct
-    JsonPayload messageBody = toJsonPayload(message);
+    JsonValue messageBody = toJsonValue(message);
 
     // Create the request
     PublishOp request = PublishOp.newBuilder()
@@ -193,13 +192,13 @@ public class GrpcBridgeExamples {
   }
 
   // Helper methods for JSON <-> Struct conversion
-  private JsonPayload toJsonPayload(JsonObject json) {
+  private JsonValue toJsonValue(JsonObject json) {
     // This is a placeholder for the actual conversion method
     // In a real implementation, you would convert JsonObject to Protobuf Struct
-    return JsonPayload.getDefaultInstance();
+    return JsonValue.getDefaultInstance();
   }
 
-  private JsonObject structToJson(Value struct) {
+  private JsonObject structToJson(JsonValue value) {
     // This is a placeholder for the actual conversion method
     // In a real implementation, you would convert Protobuf Struct to JsonObject
     return new JsonObject();
