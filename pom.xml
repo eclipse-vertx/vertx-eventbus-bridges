@@ -56,7 +56,6 @@
   <modules>
     <module>vertx-eventbus-bridges-common</module>
     <module>vertx-eventbus-bridges-grpc</module>
-    <module>vertx-eventbus-bridges-docs</module>
     <module>vertx-bridge-common</module>
   </modules>
 

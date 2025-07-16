@@ -1,21 +1,26 @@
-package examples.grpc;
+package examples;
 
+import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.Empty;
+import com.google.protobuf.Struct;
 import com.google.protobuf.Value;
 import io.vertx.core.Vertx;
+import io.vertx.core.http.HttpServerOptions;
+import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.net.SocketAddress;
 import io.vertx.core.streams.ReadStream;
+import io.vertx.docgen.Source;
 import io.vertx.eventbus.bridge.grpc.GrpcBridgeOptions;
 import io.vertx.eventbus.bridge.grpc.GrpcEventBusBridge;
 import io.vertx.eventbus.bridge.grpc.GrpcEventBusBridgeService;
-import io.vertx.ext.bridge.BridgeOptions;
 import io.vertx.ext.bridge.PermittedOptions;
 import io.vertx.grpc.event.v1alpha.*;
 import io.vertx.grpc.server.GrpcServer;
 import io.vertx.grpc.client.GrpcClient;
 
+@Source
 public class GrpcBridgeExamples {
 
   public void createServer(Vertx vertx) {
@@ -51,7 +56,32 @@ public class GrpcBridgeExamples {
     // Create the gRPC client
     GrpcClient client = GrpcClient.client(vertx);
     SocketAddress socketAddress = SocketAddress.inetSocketAddress(7000, "localhost");
-    EventBusBridgeGrpcClient grpcClient = EventBusBridgeGrpcClient.create(client, socketAddress);
+    EventBusBridgeGrpcClient bridgeClient = EventBusBridgeGrpcClient.create(client, socketAddress);
+  }
+
+  public void createJsonValueFromText() {
+    JsonValue jsonValue = JsonValue.newBuilder().setText("4").build();
+
+    JsonObject json = new JsonObject().put("name", "Julien");
+    jsonValue = JsonValue.newBuilder().setText(json.encode()).build();
+  }
+
+  public void createJsonValueFromBinary() {
+    JsonValue jsonValue = JsonValue.newBuilder().setBinary(ByteString.copyFromUtf8("4")).build();
+
+    JsonObject json = new JsonObject().put("name", "Julien");
+    jsonValue = JsonValue.newBuilder().setBinary(ByteString.copyFromUtf8(json.encode())).build();
+  }
+
+  public void createJsonValueFromStruct() {
+    JsonValue jsonValue = JsonValue.newBuilder().setProto(
+      Value.newBuilder().setNumberValue(4)).build();
+
+    jsonValue = JsonValue.newBuilder().setProto(
+      Value.newBuilder().setStructValue(Struct
+        .newBuilder()
+        .putFields("name", Value.newBuilder().setStringValue("Julien").build()))
+    ).build();
   }
 
   public void sendMessage(EventBusBridgeGrpcClient grpcClient) {
@@ -59,7 +89,7 @@ public class GrpcBridgeExamples {
     JsonObject message = new JsonObject().put("value", "Hello from gRPC client");
 
     // Convert to Protobuf Struct
-    JsonValue messageBody = toJsonValue(message);
+    JsonValue messageBody = JsonValue.newBuilder().setText(message.encode()).build();
 
     // Create the request
     SendOp request = SendOp.newBuilder()
@@ -81,14 +111,15 @@ public class GrpcBridgeExamples {
     // Create a message
     JsonObject message = new JsonObject().put("value", "Hello from gRPC client");
 
-    // Convert to Protobuf Struct
-    JsonValue messageBody = toJsonValue(message);
+    // Convert to JsonValue
+    JsonValue messageBody = JsonValue.newBuilder().setText(message.encode()).build();
 
     // Create the request with timeout
     RequestOp request = RequestOp.newBuilder()
       .setAddress("hello")
       .setBody(messageBody)
-      .setTimeout(Duration.newBuilder().setSeconds(5).build())  // 5 seconds timeout
+      .setReplyBodyFormatValue(JsonValueFormat.text_VALUE) // Ask for encoded strings
+      .setTimeout(Duration.newBuilder().setSeconds(10).build())  // 10 seconds timeout
       .build();
 
     // Send the request
@@ -96,7 +127,7 @@ public class GrpcBridgeExamples {
       if (ar.succeeded()) {
         EventBusMessage response = ar.result();
         // Convert Protobuf Struct to JsonObject
-        JsonObject responseBody = structToJson(response.getBody());
+        Object responseBody = Json.decodeValue(response.getBody().getText());
         System.out.println("Received response: " + responseBody);
       } else {
         System.err.println("Request failed: " + ar.cause());
@@ -108,8 +139,8 @@ public class GrpcBridgeExamples {
     // Create a message
     JsonObject message = new JsonObject().put("value", "Broadcast message");
 
-    // Convert to Protobuf Struct
-    JsonValue messageBody = toJsonValue(message);
+    // Convert to JsonValue
+    JsonValue messageBody = JsonValue.newBuilder().setText(message.encode()).build();
 
     // Create the request
     PublishOp request = PublishOp.newBuilder()
@@ -131,6 +162,7 @@ public class GrpcBridgeExamples {
     // Create the subscription request
     SubscribeOp request = SubscribeOp.newBuilder()
       .setAddress("news")
+      .setMessageBodyFormatValue(JsonValueFormat.text_VALUE) // Ask for encoded strings
       .build();
 
     // Subscribe to the address
@@ -145,13 +177,8 @@ public class GrpcBridgeExamples {
           String consumerId = message.getConsumerId();
 
           // Convert Protobuf Struct to JsonObject
-          JsonObject messageBody = structToJson(message.getBody());
+          Object messageBody = Json.decodeValue(message.getBody().getText());
           System.out.println("Received message: " + messageBody);
-        });
-
-        // Handle end of stream
-        stream.endHandler(v -> {
-          System.out.println("Stream ended");
         });
 
         // Handle errors
@@ -180,6 +207,25 @@ public class GrpcBridgeExamples {
     });
   }
 
+  public void replyingToAnEventBusMessage(EventBusBridgeGrpcClient grpcClient, ReadStream<EventBusMessage> streamOfMessages) {
+
+    // Set a handler for incoming messages
+    streamOfMessages.handler(message -> {
+
+      String replyAddress = message.getReplyAddress();
+
+      // Reply to the sender
+      SendOp reply = SendOp.newBuilder()
+        .setAddress(replyAddress)
+        .setBody(message.getBody())
+        .build();
+
+      // Echo the message
+      grpcClient.send(reply);
+    });
+
+  }
+
   public void healthCheck(EventBusBridgeGrpcClient grpcClient) {
     // Send a ping request
     grpcClient.ping(Empty.getDefaultInstance()).onComplete(ar -> {
@@ -196,12 +242,6 @@ public class GrpcBridgeExamples {
     // This is a placeholder for the actual conversion method
     // In a real implementation, you would convert JsonObject to Protobuf Struct
     return JsonValue.getDefaultInstance();
-  }
-
-  private JsonObject structToJson(JsonValue value) {
-    // This is a placeholder for the actual conversion method
-    // In a real implementation, you would convert Protobuf Struct to JsonObject
-    return new JsonObject();
   }
 
   public void createCustomServerWithBridgeService(Vertx vertx) {
@@ -241,7 +281,7 @@ public class GrpcBridgeExamples {
       });
   }
 
-  public void createServerWithMultipleServices(Vertx vertx) {
+  public void createServerWithMultipleServices(Vertx vertx, HttpServerOptions serverOptions) {
     // Create a custom gRPC server
     GrpcServer grpcServer = GrpcServer.server(vertx);
 
@@ -265,9 +305,9 @@ public class GrpcBridgeExamples {
     bridgeService.bind(grpcServer);
 
     // Create an HTTP server and use the gRPC server as request handler
-    vertx.createHttpServer()
+    vertx.createHttpServer(serverOptions)
       .requestHandler(grpcServer)
-      .listen(8080)
+      .listen()
       .onComplete(ar -> {
         if (ar.succeeded()) {
           System.out.println("gRPC server with multiple services started on port 8080");
@@ -277,7 +317,7 @@ public class GrpcBridgeExamples {
       });
   }
 
-  public void createBridgeServiceWithAdvancedConfig(Vertx vertx) {
+  public void createBridgeServiceWithAdvancedConfig(Vertx vertx, HttpServerOptions serverOptions) {
     // Advanced bridge configuration
     GrpcBridgeOptions options = new GrpcBridgeOptions()
       // Inbound permissions (client -> EventBus)
@@ -330,9 +370,9 @@ public class GrpcBridgeExamples {
     bridgeService.bind(grpcServer);
 
     // Create an HTTP server and use the gRPC server as request handler
-    vertx.createHttpServer()
+    vertx.createHttpServer(serverOptions)
       .requestHandler(grpcServer)
-      .listen(9000)
+      .listen()
       .onComplete(ar -> {
         if (ar.succeeded()) {
           System.out.println("Advanced gRPC EventBus bridge started on port 9000");

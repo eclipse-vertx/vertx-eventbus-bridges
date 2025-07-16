@@ -1,6 +1,7 @@
 = Vert.x gRPC EventBus Bridge
 
 Vert.x gRPC EventBus Bridge is a gRPC bridge to Vert.x EventBus.
+
 To use this project, add the following dependency to the _dependencies_ section of your build descriptor:
 
 [tabs]
@@ -24,8 +25,12 @@ compile '${maven.groupId}:${maven.artifactId}:${maven.version}'
 ----
 ====
 
-The gRPC EventBus Bridge is built on top of gRPC, meaning that any application that can create gRPC clients can interact with a remote Vert.x instance via its event bus.
-The main use case for the gRPC bridge is for applications that need a standardized, high-performance, and language-agnostic way to communicate with a Vert.x EventBus. gRPC provides a modern, open-source RPC framework that uses HTTP/2 for transport, Protocol Buffers as the interface description language.
+The gRPC EventBus Bridge is built on top of gRPC, meaning that any application that can create gRPC clients can interact
+with a remote Vert.x instance via its event bus. The main use case for the gRPC bridge is for applications that need a
+standardized, high-performance, and language-agnostic way to communicate with a Vert.x EventBus.
+
+gRPC provides a modern, open-source RPC framework that uses HTTP/2 for transport, Protocol Buffers as the interface description language.
+
 The bridge also supports gRPC-Web, allowing web clients to communicate with the gRPC server.
 
 == Protocol Description
@@ -42,6 +47,38 @@ The service definition includes the following operations:
 
 The message structures are defined as follows:
 
+=== JsonValue
+
+The bridge handles Json values which can be one of _object_, _array_, _number_, _string_, `true`/`false` or `null`,
+the `JsonValue` message type is usef for this mater.
+
+A `JsonValue` wraps either a string, a byte array or a `google.protobuf.Value`.
+
+You can create a `JsonValue` from a string:
+
+[source,java]
+----
+{@link examples.GrpcBridgeExamples#createJsonValueFromText}
+----
+
+or from a byte array:
+
+[source,java]
+----
+{@link examples.GrpcBridgeExamples#createJsonValueFromBinary}
+----
+
+or from `google.protobuf.Value`:
+
+[source,java]
+----
+{@link examples.GrpcBridgeExamples#createJsonValueFromStruct}
+----
+
+You can send a `JsonValue` using any of these formats.
+
+When you interact with the bridge, you can specify the format you want as a client as part of the bridge interactions.
+
 === PublishOp
 
 Used for publishing messages to an address:
@@ -55,8 +92,8 @@ message PublishOp {
   // Message headers
   map<string, string> headers = 2;
 
-  // Message payload as structured data
-  google.protobuf.Struct body = 3;
+  // Message payload
+  JsonValue body = 3;
 }
 ----
 
@@ -70,17 +107,14 @@ message SendOp {
   // The address the message was sent to
   string address = 1;
 
-  // Optional reply address
-  string reply_address = 2;
-
   // Message headers
-  map<string, string> headers = 3;
+  map<string, string> headers = 2;
 
-  // Message payload as structured data
-  google.protobuf.Struct body = 4;
+  // Message payload
+  JsonValue body = 3;
 
   // Timeout in milliseconds
-  google.protobuf.Duration timeout = 5;
+  google.protobuf.Duration timeout = 4;
 }
 ----
 
@@ -94,14 +128,14 @@ message RequestOp {
   // The address the message was sent to
   string address = 1;
 
-  // Optional reply address
-  string reply_address = 2;
-
   // Message headers
-  map<string, string> headers = 3;
+  map<string, string> headers = 2;
 
-  // Message payload as structured data
-  google.protobuf.Struct body = 4;
+  // Message payload
+  JsonValue body = 3;
+
+  // The desired format of the reply body
+  JsonValueFormat reply_body_format = 4;
 
   // Timeout in milliseconds
   google.protobuf.Duration timeout = 5;
@@ -118,11 +152,11 @@ message SubscribeOp {
   // The address to subscribe to
   string address = 1;
 
-  // Consumer for subscription management
-  string consumer = 2;
-
   // Message headers
-  map<string, string> headers = 3;
+  map<string, string> headers = 2;
+
+  // The desired format of the message body sent by the bridge
+  JsonValueFormat message_body_format = 3;
 }
 ----
 
@@ -133,11 +167,8 @@ Used for unsubscribing from an address:
 [source,proto]
 ----
 message UnsubscribeOp {
-  // The address to unsubscribe from
-  string address = 1;
-
-  // Consumer for subscription management
-  string consumer = 2;
+  // The consumer ID for subscription management
+  string consumer_id = 1;
 }
 ----
 
@@ -151,17 +182,19 @@ message EventBusMessage {
   // The address the message was sent to
   string address = 1;
 
-  // Consumer for subscription management
-  string consumer = 2;
+  // The consumer ID for subscription management
+  string consumer_id = 2;
 
   // Optional reply address
+  // Presence means that the message is expecting a reply at this reply address
+  // This reply address shall be used in Send rpc or Request rpc
   string reply_address = 3;
 
   // Message headers
   map<string, string> headers = 4;
 
   // Message payload
-  google.protobuf.Struct body = 5;
+  JsonValue body = 5;
 
   // Optional status for error responses
   google.rpc.Status status = 6;
@@ -176,7 +209,7 @@ Here's an example of how to create and start a gRPC EventBus Bridge server:
 
 [source,java]
 ----
-{@link examples.grpc.GrpcBridgeExamples#createServer}
+{@link examples.GrpcBridgeExamples#createServer}
 ----
 
 === Creating a gRPC Client
@@ -185,7 +218,7 @@ Here's how to create a gRPC client to connect to the bridge:
 
 [source,java]
 ----
-{@link examples.grpc.GrpcBridgeExamples#createClient}
+{@link examples.GrpcBridgeExamples#createClient}
 ----
 
 === Sending Messages
@@ -194,7 +227,7 @@ To send a message to an address:
 
 [source,java]
 ----
-{@link examples.grpc.GrpcBridgeExamples#sendMessage}
+{@link examples.GrpcBridgeExamples#sendMessage}
 ----
 
 === Request-Response Pattern
@@ -203,7 +236,7 @@ To send a request and receive a response:
 
 [source,java]
 ----
-{@link examples.grpc.GrpcBridgeExamples#requestResponse}
+{@link examples.GrpcBridgeExamples#requestResponse}
 ----
 
 === Publishing Messages
@@ -212,7 +245,7 @@ To publish a message to all subscribers:
 
 [source,java]
 ----
-{@link examples.grpc.GrpcBridgeExamples#publishMessage}
+{@link examples.GrpcBridgeExamples#publishMessage}
 ----
 
 === Subscribing to Messages
@@ -221,7 +254,7 @@ To subscribe to messages from an address:
 
 [source,java]
 ----
-{@link examples.grpc.GrpcBridgeExamples#subscribeToMessages}
+{@link examples.GrpcBridgeExamples#subscribeToMessages}
 ----
 
 === Unsubscribing from Messages
@@ -230,7 +263,18 @@ To unsubscribe from an address:
 
 [source,java]
 ----
-{@link examples.grpc.GrpcBridgeExamples#unsubscribeFromMessages}
+{@link examples.GrpcBridgeExamples#unsubscribeFromMessages}
+----
+
+=== Replying to message
+
+When an `EventBusMessage` carries a reply address, the sender of this message expects a reply.
+
+The reply address can be used to send the reply.
+
+[source,java]
+----
+{@link examples.GrpcBridgeExamples#replyingToAnEventBusMessage}
 ----
 
 === Health Check
@@ -239,7 +283,7 @@ To perform a health check:
 
 [source,java]
 ----
-{@link examples.grpc.GrpcBridgeExamples#healthCheck}
+{@link examples.GrpcBridgeExamples#healthCheck}
 ----
 
 == Using GrpcEventBusBridgeService with Custom gRPC Server
@@ -253,7 +297,7 @@ Here's how to integrate the EventBus bridge service into your existing gRPC serv
 
 [source,java]
 ----
-{@link examples.grpc.GrpcBridgeExamples#createCustomServerWithBridgeService}
+{@link examples.GrpcBridgeExamples#createCustomServerWithBridgeService}
 ----
 
 === Custom Server with Multiple Services
@@ -262,7 +306,7 @@ You can easily combine the EventBus bridge with your own custom gRPC services:
 
 [source,java]
 ----
-{@link examples.grpc.GrpcBridgeExamples#createServerWithMultipleServices}
+{@link examples.GrpcBridgeExamples#createServerWithMultipleServices}
 ----
 
 === Advanced Configuration
@@ -271,5 +315,5 @@ The `GrpcEventBusBridgeService` supports the same configuration options as the s
 
 [source,java]
 ----
-{@link examples.grpc.GrpcBridgeExamples#createBridgeServiceWithAdvancedConfig}
+{@link examples.GrpcBridgeExamples#createBridgeServiceWithAdvancedConfig}
 ----
