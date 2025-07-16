@@ -8,7 +8,6 @@ import io.vertx.core.Handler;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.eventbus.DeliveryOptions;
 import io.vertx.core.eventbus.EventBus;
-import io.vertx.core.eventbus.MessageConsumer;
 import io.vertx.core.eventbus.ReplyException;
 import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
@@ -20,7 +19,6 @@ import io.vertx.grpc.common.GrpcStatus;
 import io.vertx.grpc.event.v1alpha.EventBusMessage;
 import io.vertx.grpc.event.v1alpha.JsonValue;
 import io.vertx.grpc.event.v1alpha.JsonValueFormat;
-import io.vertx.grpc.event.v1alpha.SubscribeOp;
 import io.vertx.grpc.server.GrpcServerRequest;
 
 import java.util.HashMap;
@@ -86,25 +84,25 @@ public abstract class EventBusBridgeHandlerBase<Req, Resp> implements Handler<Gr
    *
    * This method uses the Protocol Buffers JSON format to parse the JSON object into a Protocol Buffers message of the specified type.
    *
-   * @param json the JSON object to convert
+   * @param value the JSON object to convert
    * @return a Protocol Buffers message representing the JSON object
    */
-  public static JsonValue jsonToProto(JsonObject json, JsonValueFormat payloadType) {
+  public static JsonValue toJsonValue(Object value, JsonValueFormat payloadType) {
     JsonValue.Builder payloadBuilder = JsonValue.newBuilder();
     switch (payloadType) {
       case proto:
         Value.Builder structBuilder = Value.newBuilder();
         try {
-          JsonFormat.parser().merge(json.encode(), structBuilder);
+          JsonFormat.parser().merge(Json.encode(value), structBuilder);
         } catch (Exception ignored) {
         }
         payloadBuilder.setProto(structBuilder);
         break;
       case binary:
-        payloadBuilder.setBinary(ByteString.copyFrom(json.toBuffer().getBytes()));
+        payloadBuilder.setBinary(ByteString.copyFrom(Json.encodeToBuffer(value).getBytes()));
         break;
       case text:
-        payloadBuilder.setText(json.encode());
+        payloadBuilder.setText(Json.encode(value));
         break;
     }
     return payloadBuilder.build();

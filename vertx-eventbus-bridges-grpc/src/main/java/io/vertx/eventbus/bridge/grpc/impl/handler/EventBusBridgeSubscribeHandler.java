@@ -130,11 +130,11 @@ public class EventBusBridgeSubscribeHandler extends EventBusBridgeHandlerBase<Su
 
       JsonValue body;
       if (message.body() instanceof JsonObject) {
-        body = jsonToProto((JsonObject) message.body(), jsonValueFormat);
+        body = toJsonValue(message.body(), jsonValueFormat);
       } else if (message.body() instanceof String) {
-        body = jsonToProto(new JsonObject(String.valueOf(message.body())), jsonValueFormat);
+        body = toJsonValue(message.body(), jsonValueFormat);
       } else {
-        body = jsonToProto(new JsonObject().put("value", String.valueOf(message.body())), jsonValueFormat);
+        body = toJsonValue(message.body(), jsonValueFormat);
       }
 
       EventBusMessage response = EventBusMessage.newBuilder()

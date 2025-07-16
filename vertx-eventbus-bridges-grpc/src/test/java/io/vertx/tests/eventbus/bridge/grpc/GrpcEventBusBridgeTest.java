@@ -21,6 +21,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 import static org.junit.Assert.*;
 
@@ -343,65 +345,36 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
     context.assertEquals(1, tags.getInteger("severity"));
   }
 
-  @Test
-  public void testSubscribeWithComplexBody(TestContext context) {
+  private void testSubscribe(TestContext context, String address, Supplier<Object> bodySupplier, Consumer<JsonValue> checker) {
     Async async = context.async();
-    AtomicReference<String> consumerId = new AtomicReference<>();
 
     // Update the ping consumer to send a complex body
     long timerID = vertx.setPeriodic(10, id -> {
-      JsonObject complexPingBody = new JsonObject()
-        .put("messageId", "vertx-msg-001")
-        .put("timestamp", System.currentTimeMillis())
-        .put("sender", new JsonObject()
-          .put("service", "vertx-eventbus-bridge")
-          .put("version", "4.0.0"))
-        .put("payload", new JsonObject()
-          .put("status", "active")
-          .put("metrics", new JsonObject()
-            .put("cpu", 50.0)
-            .put("memory", 80.0)
-            .put("uptime", 7200)));
-
-      vertx.eventBus().send("complex-ping", complexPingBody);
+      vertx.eventBus().send(address, bodySupplier.get());
     });
 
-    SubscribeOp request = SubscribeOp.newBuilder().setAddress("complex-ping").build();
+    SubscribeOp request = SubscribeOp.newBuilder().setAddress(address).build();
 
     ReadStream<EventBusMessage> stream = grpcClient.subscribe(request).await();
-    AtomicBoolean subscribed = new AtomicBoolean(true);
+    AtomicInteger amount = new AtomicInteger(10);
     stream.handler(response -> {
-      consumerId.set(response.getConsumerId());
 
-      context.assertEquals("complex-ping", response.getAddress());
+      context.assertEquals(address, response.getAddress());
       context.assertNotNull(response.getBody());
 
       JsonValue body = response.getBody();
-      JsonObject jsonBody = valueToJson(body);
 
-      context.assertEquals("vertx-msg-001", jsonBody.getString("messageId"));
-      context.assertNotNull(jsonBody.getLong("timestamp"));
+      try {
+        checker.accept(body);
+      } catch (Exception e) {
+        vertx.cancelTimer(timerID);
+        context.fail(e);
+      }
 
-      JsonObject sender = jsonBody.getJsonObject("sender");
-      context.assertNotNull(sender);
-      context.assertEquals("vertx-eventbus-bridge", sender.getString("service"));
-      context.assertEquals("4.0.0", sender.getString("version"));
-
-      JsonObject payload = jsonBody.getJsonObject("payload");
-      context.assertNotNull(payload);
-      context.assertEquals("active", payload.getString("status"));
-
-      JsonObject metrics = payload.getJsonObject("metrics");
-      context.assertNotNull(metrics);
-      context.assertEquals(50.0, metrics.getDouble("cpu"));
-      context.assertEquals(80.0, metrics.getDouble("memory"));
-      context.assertEquals(7200, metrics.getInteger("uptime"));
-
-      if (subscribed.compareAndSet(true, false)) {
+      if (amount.decrementAndGet() == 0) {
         UnsubscribeOp unsubRequest = UnsubscribeOp.newBuilder()
-          .setConsumerId(consumerId.get())
+          .setConsumerId(response.getConsumerId())
           .build();
-
         grpcClient
           .unsubscribe(unsubRequest)
           .onComplete(context.asyncAssertSuccess(unsubResponse -> async.complete()));
@@ -409,6 +382,58 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
     });
 
     async.awaitSuccess(5000);
+  }
+
+  @Test
+  public void testSubscribeWithComplexBody(TestContext context) {
+    testSubscribe(context, "complex-ping", () -> new JsonObject()
+      .put("messageId", "vertx-msg-001")
+      .put("timestamp", System.currentTimeMillis())
+      .put("sender", new JsonObject()
+        .put("service", "vertx-eventbus-bridge")
+        .put("version", "4.0.0"))
+      .put("payload", new JsonObject()
+        .put("status", "active")
+        .put("metrics", new JsonObject()
+          .put("cpu", 50.0)
+          .put("memory", 80.0)
+          .put("uptime", 7200))), value -> {
+      JsonObject jsonBody = valueToJson(value);
+
+      assertEquals("vertx-msg-001", jsonBody.getString("messageId"));
+      assertNotNull(jsonBody.getLong("timestamp"));
+
+      JsonObject sender = jsonBody.getJsonObject("sender");
+      assertNotNull(sender);
+      assertEquals("vertx-eventbus-bridge", sender.getString("service"));
+      assertEquals("4.0.0", sender.getString("version"));
+
+      JsonObject payload = jsonBody.getJsonObject("payload");
+      assertNotNull(payload);
+      assertEquals("active", payload.getString("status"));
+
+      JsonObject metrics = payload.getJsonObject("metrics");
+      assertNotNull(metrics);
+      assertEquals(50.0, metrics.getDouble("cpu"), 0.0001);
+      assertEquals(80.0, metrics.getDouble("memory"), 0.0001);
+      assertEquals(7200, metrics.getInteger("uptime"), 0.0001);
+    });
+  }
+
+  @Test
+  public void testSubscribeWithNumber(TestContext context) {
+    testSubscribe(context, "complex-ping", () -> 4.1D, value -> {
+      Double v = valueToJson(value);
+      assertEquals(4.1D, v, 0.0001D);
+    });
+  }
+
+  @Test
+  public void testSubscribeWithString(TestContext context) {
+    testSubscribe(context, "complex-ping", () -> "the-string", value -> {
+      String v = valueToJson(value);
+      assertEquals("the-string", v);
+    });
   }
 
     /*@Test

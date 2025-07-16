@@ -68,32 +68,29 @@ public abstract class GrpcEventBusBridgeTestBase {
 
   }
 
-  public static JsonObject valueToJson(JsonValue value) {
+  public static <T> T valueToJson(JsonValue value) {
     return valueToJson(value, JsonValueFormat.proto);
   }
 
   /**
    * Convert a Protobuf Value to a JsonObject
    */
-  public static JsonObject valueToJson(JsonValue value, JsonValueFormat bodyType) {
-    if (value == null) {
-      return new JsonObject();
-    }
+  public static <T> T valueToJson(JsonValue value, JsonValueFormat bodyType) {
 
     switch (bodyType) {
       case proto:
-        JsonObject json = new JsonObject();
         try {
           String jsonString = JsonFormat.printer().print(value.getProto());
-          json = new JsonObject(jsonString);
+          return (T) Json.decodeValue(jsonString);
         } catch (Exception e) {
-          // If parsing fails, return empty object
+          AssertionFailedError afe = new AssertionFailedError();
+          afe.initCause(e);
+          throw afe;
         }
-        return json;
       case binary:
-        return new JsonObject(Buffer.buffer(value.getBinary().toByteArray()));
+        return (T) Json.decodeValue(Buffer.buffer(value.getBinary().toByteArray()));
       case text:
-        return new JsonObject(value.getText());
+        return (T) Json.decodeValue(value.getText());
       default:
         throw new UnsupportedOperationException();
     }
