@@ -112,11 +112,6 @@ public class EventBusBridgeRequestHandler extends EventBusBridgeHandlerBase<Requ
       event.put("address", request.getAddress());
     }
 
-    // Add reply address if present
-    if (!request.getReplyAddress().isEmpty()) {
-      event.put("replyAddress", request.getReplyAddress());
-    }
-
     // Add headers if present
     if (!request.getHeadersMap().isEmpty()) {
       JsonObject headers = new JsonObject();

@@ -9,20 +9,37 @@ import io.vertx.ext.bridge.PermittedOptions;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Objects;
 
+/**
+ * gRPC bridge options.
+ */
 @DataObject
 public class GrpcBridgeOptions extends BridgeOptions {
 
   private Duration replyTimeout = Duration.of(DeliveryOptions.DEFAULT_TIMEOUT, ChronoUnit.SECONDS);
 
+  /**
+   * @return the reply timeout
+   */
   @GenIgnore(GenIgnore.PERMITTED_TYPE)
   public Duration getReplyTimeout() {
     return replyTimeout;
   }
 
+  /**
+   * <p>The value at which the bridge considers a reply from bridge clients to not happen. When the timeout fires
+   * the bridge fails the pending reply.</p>
+   *
+   * <p>Explanation: an event-bus reply handler has an implicit timeout, unfortunately this timeout value is not
+   * propagated, as such the bridge needs such timeout value. This value is equivalent to {@link DeliveryOptions#getSendTimeout()}</p>
+   *
+   * @param replyTimeout the timeout
+   * @return the reference to this object
+   */
   @GenIgnore(GenIgnore.PERMITTED_TYPE)
   public GrpcBridgeOptions setReplyTimeout(Duration replyTimeout) {
-    this.replyTimeout = replyTimeout;
+    this.replyTimeout = Objects.requireNonNull(replyTimeout);
     return this;
   }
 
