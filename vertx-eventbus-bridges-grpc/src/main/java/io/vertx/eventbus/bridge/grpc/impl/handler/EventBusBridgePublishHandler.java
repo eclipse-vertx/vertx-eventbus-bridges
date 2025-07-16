@@ -7,6 +7,7 @@ import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.json.JsonObject;
 import io.vertx.eventbus.bridge.grpc.BridgeEvent;
 import io.vertx.eventbus.bridge.grpc.impl.EventBusBridgeHandlerBase;
+import io.vertx.eventbus.bridge.grpc.impl.ReplyManager;
 import io.vertx.ext.bridge.BridgeEventType;
 import io.vertx.ext.bridge.BridgeOptions;
 import io.vertx.grpc.common.*;
@@ -24,8 +25,9 @@ public class EventBusBridgePublishHandler extends EventBusBridgeHandlerBase<Publ
     GrpcMessageEncoder.encoder(),
     GrpcMessageDecoder.decoder(PublishOp.newBuilder()));
 
-  public EventBusBridgePublishHandler(EventBus bus, BridgeOptions options, Handler<BridgeEvent> bridgeEventHandler, Map<String, Pattern> compiledREs) {
-    super(bus, options, bridgeEventHandler, compiledREs);
+  public EventBusBridgePublishHandler(EventBus bus, BridgeOptions options, Handler<BridgeEvent> bridgeEventHandler,
+                                      ReplyManager replies, Map<String, Pattern> compiledREs) {
+    super(bus, options, bridgeEventHandler, replies, compiledREs);
   }
 
   @Override

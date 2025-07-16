@@ -8,7 +8,9 @@ import io.vertx.core.Handler;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.eventbus.DeliveryOptions;
 import io.vertx.core.eventbus.EventBus;
+import io.vertx.core.eventbus.Message;
 import io.vertx.core.eventbus.ReplyException;
+import io.vertx.core.internal.ContextInternal;
 import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
 import io.vertx.eventbus.bridge.grpc.BridgeEvent;
@@ -24,7 +26,7 @@ import io.vertx.grpc.server.GrpcServerRequest;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.UUID;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -34,18 +36,19 @@ import java.util.regex.Pattern;
  */
 public abstract class EventBusBridgeHandlerBase<Req, Resp> implements Handler<GrpcServerRequest<Req, Resp>> {
 
-  protected static final Map<String, io.vertx.core.eventbus.Message<?>> replies = new ConcurrentHashMap<>();
-
   protected final EventBus bus;
   protected final BridgeOptions options;
   protected final Handler<BridgeEvent> bridgeEventHandler;
   protected final Map<String, Pattern> compiledREs;
+  protected final ReplyManager replies;
 
-  public EventBusBridgeHandlerBase(EventBus bus, BridgeOptions options, Handler<BridgeEvent> bridgeEventHandler, Map<String, Pattern> compiledREs) {
+  public EventBusBridgeHandlerBase(EventBus bus, BridgeOptions options, Handler<BridgeEvent> bridgeEventHandler,
+                                   ReplyManager replies, Map<String, Pattern> compiledREs) {
     this.bus = bus;
     this.options = options != null ? options : new BridgeOptions();
     this.bridgeEventHandler = bridgeEventHandler;
     this.compiledREs = compiledREs != null ? compiledREs : new HashMap<>();
+    this.replies = replies;
   }
 
   /**
@@ -57,10 +60,6 @@ public abstract class EventBusBridgeHandlerBase<Req, Resp> implements Handler<Gr
    * @return a JSON object representing the message
    */
   protected static Object protoToJson(JsonValue payload) {
-    if (payload == null) {
-      return new JsonObject();
-    }
-
     switch (payload.getValueCase()) {
       case TEXT:
         return Json.decodeValue(payload.getText());
@@ -315,4 +314,5 @@ public abstract class EventBusBridgeHandlerBase<Req, Resp> implements Handler<Gr
    * @return a JSON object representing the event
    */
   protected abstract JsonObject createEvent(String type, Req request);
+
 }

@@ -7,6 +7,7 @@ import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.net.SocketAddress;
 import io.vertx.core.streams.ReadStream;
+import io.vertx.eventbus.bridge.grpc.GrpcBridgeOptions;
 import io.vertx.eventbus.bridge.grpc.GrpcEventBusBridge;
 import io.vertx.eventbus.bridge.grpc.GrpcEventBusBridgeService;
 import io.vertx.ext.bridge.BridgeOptions;
@@ -19,7 +20,7 @@ public class GrpcBridgeExamples {
 
   public void createServer(Vertx vertx) {
     // Configure bridge options
-    BridgeOptions options = new BridgeOptions()
+    GrpcBridgeOptions options = new GrpcBridgeOptions()
       .addInboundPermitted(new PermittedOptions().setAddress("hello"))
       .addInboundPermitted(new PermittedOptions().setAddress("echo"))
       .addOutboundPermitted(new PermittedOptions().setAddress("news"));
@@ -205,7 +206,7 @@ public class GrpcBridgeExamples {
 
   public void createCustomServerWithBridgeService(Vertx vertx) {
     // Configure bridge options
-    BridgeOptions options = new BridgeOptions()
+    GrpcBridgeOptions options = new GrpcBridgeOptions()
       .addInboundPermitted(new PermittedOptions().setAddress("hello"))
       .addInboundPermitted(new PermittedOptions().setAddress("echo"))
       .addOutboundPermitted(new PermittedOptions().setAddress("news"));
@@ -251,7 +252,7 @@ public class GrpcBridgeExamples {
     // anotherService.bind(grpcServer);
 
     // Configure and add the EventBus bridge service
-    BridgeOptions options = new BridgeOptions()
+    GrpcBridgeOptions options = new GrpcBridgeOptions()
       .addInboundPermitted(new PermittedOptions().setAddress("hello"))
       .addOutboundPermitted(new PermittedOptions().setAddress("notifications"));
 
@@ -278,7 +279,7 @@ public class GrpcBridgeExamples {
 
   public void createBridgeServiceWithAdvancedConfig(Vertx vertx) {
     // Advanced bridge configuration
-    BridgeOptions options = new BridgeOptions()
+    GrpcBridgeOptions options = new GrpcBridgeOptions()
       // Inbound permissions (client -> EventBus)
       .addInboundPermitted(new PermittedOptions().setAddress("api.users"))
       .addInboundPermitted(new PermittedOptions().setAddress("api.orders"))

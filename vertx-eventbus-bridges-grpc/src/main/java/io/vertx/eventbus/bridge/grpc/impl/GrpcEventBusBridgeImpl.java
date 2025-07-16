@@ -10,6 +10,7 @@ import io.vertx.core.http.HttpServerOptions;
 import io.vertx.core.internal.logging.Logger;
 import io.vertx.core.internal.logging.LoggerFactory;
 import io.vertx.eventbus.bridge.grpc.BridgeEvent;
+import io.vertx.eventbus.bridge.grpc.GrpcBridgeOptions;
 import io.vertx.eventbus.bridge.grpc.GrpcEventBusBridge;
 import io.vertx.ext.bridge.BridgeOptions;
 import io.vertx.grpc.server.GrpcServer;
@@ -29,20 +30,20 @@ public class GrpcEventBusBridgeImpl implements GrpcEventBusBridge {
 
   private final Vertx vertx;
   private final EventBus eb;
-  private final BridgeOptions options;
+  private final GrpcBridgeOptions options;
   private final Handler<BridgeEvent> bridgeEventHandler;
   private final int port;
   private HttpServer server;
 
-  public GrpcEventBusBridgeImpl(Vertx vertx, BridgeOptions options, int port, Handler<BridgeEvent> eventHandler) {
+  public GrpcEventBusBridgeImpl(Vertx vertx, GrpcBridgeOptions options, int port, Handler<BridgeEvent> eventHandler) {
     this.vertx = vertx;
     this.eb = vertx.eventBus();
-    this.options = options != null ? options : new BridgeOptions();
+    this.options = options != null ? options : new GrpcBridgeOptions();
     this.bridgeEventHandler = eventHandler;
     this.port = port;
   }
 
-  public GrpcEventBusBridgeImpl(Vertx vertx, BridgeOptions options, int port) {
+  public GrpcEventBusBridgeImpl(Vertx vertx, GrpcBridgeOptions options, int port) {
     this(vertx, options, port, null);
   }
 

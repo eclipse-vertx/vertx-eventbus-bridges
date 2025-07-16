@@ -35,7 +35,7 @@ public interface GrpcEventBusBridge {
    * @param options the bridge options for controlling access to the EventBus
    * @return a new instance of GrpcEventBusBridge
    */
-  static GrpcEventBusBridge create(Vertx vertx, BridgeOptions options) {
+  static GrpcEventBusBridge create(Vertx vertx, GrpcBridgeOptions options) {
     return create(vertx, options, 0);
   }
 
@@ -47,7 +47,7 @@ public interface GrpcEventBusBridge {
    * @param port the port on which the gRPC server will listen
    * @return a new instance of GrpcEventBusBridge
    */
-  static GrpcEventBusBridge create(Vertx vertx, BridgeOptions options, int port) {
+  static GrpcEventBusBridge create(Vertx vertx, GrpcBridgeOptions options, int port) {
     return create(vertx, options, port, null);
   }
 
@@ -61,7 +61,7 @@ public interface GrpcEventBusBridge {
    * @param eventHandler a handler for bridge events that can be used to implement custom security logic
    * @return a new instance of GrpcEventBusBridge
    */
-  static GrpcEventBusBridge create(Vertx vertx, BridgeOptions options, int port, Handler<BridgeEvent> eventHandler) {
+  static GrpcEventBusBridge create(Vertx vertx, GrpcBridgeOptions options, int port, Handler<BridgeEvent> eventHandler) {
     return new GrpcEventBusBridgeImpl(vertx, options, port, eventHandler);
   }
 

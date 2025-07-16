@@ -1,10 +1,8 @@
 package io.vertx.tests.eventbus.bridge.grpc;
 
 import com.google.protobuf.Empty;
-import com.google.protobuf.Value;
 import com.google.protobuf.util.Durations;
 import io.vertx.core.MultiMap;
-import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.eventbus.Message;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.net.SocketAddress;
@@ -12,6 +10,7 @@ import io.vertx.core.streams.ReadStream;
 import io.vertx.ext.unit.Async;
 import io.vertx.ext.unit.TestContext;
 import io.vertx.grpc.client.GrpcClient;
+import io.vertx.grpc.client.GrpcClientRequest;
 import io.vertx.grpc.client.GrpcClientResponse;
 import io.vertx.grpc.event.v1alpha.*;
 import org.junit.After;
@@ -29,6 +28,9 @@ import static org.junit.Assert.*;
 
 public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
 
+  private static final SocketAddress BRIDGE_ADDRESS = SocketAddress.inetSocketAddress(7000, "localhost");
+
+
   private GrpcClient client;
   private EventBusBridgeGrpcClient grpcClient;
 
@@ -38,8 +40,7 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
 
     client = GrpcClient.client(vertx);
 
-    SocketAddress socketAddress = SocketAddress.inetSocketAddress(7000, "localhost");
-    grpcClient = EventBusBridgeGrpcClient.create(client, socketAddress);
+    grpcClient = EventBusBridgeGrpcClient.create(client, BRIDGE_ADDRESS);
   }
 
   @After
@@ -82,6 +83,7 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
     async.awaitSuccess(5000);
   }
 
+/*
   @Test
   public void testSendWithReply() {
     JsonObject userProfile = new JsonObject()
@@ -100,9 +102,84 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
 
     grpcClient.send(request).await();
   }
+*/
 
   @Test
-  public void testRequest(TestContext context) {
+  public void testReplyToRequest(TestContext context) {
+
+    Async async = context.async();
+
+    vertx.eventBus().<Double>consumer("the-address", msg -> {
+      msg.<Double>replyAndRequest(msg.body() + 1)
+        .onComplete(context.asyncAssertSuccess(reply -> {
+        context.assertEquals(2.0, reply.body());
+        async.complete();
+      }));
+    });
+
+    RequestOp request = RequestOp.newBuilder()
+      .setAddress("the-address")
+      .setBody(jsonToPayload(1))
+      .build();
+
+    EventBusMessage msg = grpcClient.request(request).await();
+    assertFalse(msg.getReplyAddress().isEmpty());
+
+    SendOp send = SendOp.newBuilder()
+      .setAddress(msg.getReplyAddress())
+      .setBody(jsonToPayload(2))
+      .build();
+    grpcClient.send(send).await();
+
+    async.awaitSuccess(5_000);
+  }
+
+  @Test
+  public void testReplyToSubscribe(TestContext context) {
+    SubscribeOp sub = SubscribeOp.newBuilder()
+      .setAddress("the-address")
+      .build();
+
+    ReadStream<EventBusMessage> messages = grpcClient.subscribe(sub).await();
+    messages.handler(msg -> {
+      assertFalse(msg.getReplyAddress().isEmpty());
+      SendOp send = SendOp.newBuilder()
+        .setAddress(msg.getReplyAddress())
+        .setBody(jsonToPayload(2))
+        .build();
+      grpcClient.send(send);
+    });
+
+    Message<Object> reply = vertx.eventBus().request("the-address", "the-msg").await();
+    assertEquals(2.0, reply.body());
+  }
+
+  @Test
+  public void testReplyTimeout(TestContext context) {
+
+    Async async = context.async();
+
+    vertx.eventBus().<Double>consumer("the-address", msg -> {
+      msg.<Double>replyAndRequest(msg.body() + 1)
+        .onComplete(context.asyncAssertFailure(reply -> {
+          async.complete();
+        }));
+    });
+
+    RequestOp request = RequestOp.newBuilder()
+      .setAddress("the-address")
+      .setBody(jsonToPayload(1))
+      .build();
+
+    EventBusMessage msg = grpcClient.request(request).await();
+    assertFalse(msg.getReplyAddress().isEmpty());
+
+
+    async.awaitSuccess(5_000);
+  }
+
+  @Test
+  public void testRequest() {
     JsonObject requestBody = new JsonObject()
       .put("value", "vert.x")
       .put("timestamp", System.currentTimeMillis())

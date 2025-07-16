@@ -7,6 +7,7 @@ import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.json.JsonObject;
 import io.vertx.eventbus.bridge.grpc.BridgeEvent;
 import io.vertx.eventbus.bridge.grpc.impl.EventBusBridgeHandlerBase;
+import io.vertx.eventbus.bridge.grpc.impl.ReplyManager;
 import io.vertx.ext.bridge.BridgeEventType;
 import io.vertx.ext.bridge.BridgeOptions;
 import io.vertx.grpc.common.*;
@@ -18,6 +19,8 @@ import io.vertx.grpc.server.GrpcServerRequest;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 public class EventBusBridgeRequestHandler extends EventBusBridgeHandlerBase<RequestOp, EventBusMessage> {
@@ -28,8 +31,9 @@ public class EventBusBridgeRequestHandler extends EventBusBridgeHandlerBase<Requ
     GrpcMessageEncoder.encoder(),
     GrpcMessageDecoder.decoder(RequestOp.newBuilder()));
 
-  public EventBusBridgeRequestHandler(EventBus bus, BridgeOptions options, Handler<BridgeEvent> bridgeEventHandler, Map<String, Pattern> compiledREs) {
-    super(bus, options, bridgeEventHandler, compiledREs);
+  public EventBusBridgeRequestHandler(EventBus bus, BridgeOptions options, Handler<BridgeEvent> bridgeEventHandler,
+                                      ReplyManager replies, Map<String, Pattern> compiledREs) {
+    super(bus, options, bridgeEventHandler, replies, compiledREs);
   }
 
   @Override
@@ -69,19 +73,22 @@ public class EventBusBridgeRequestHandler extends EventBusBridgeHandlerBase<Requ
               JsonValue replyBody;
 
               if (reply.body() instanceof JsonObject) {
-                replyBody = toJsonValue((JsonObject) reply.body(), replyBodyType);
+                replyBody = toJsonValue(reply.body(), replyBodyType);
               } else if (reply.body() instanceof String) {
                 replyBody = toJsonValue(new JsonObject().put("value", reply.body()), replyBodyType);
               } else {
                 replyBody = toJsonValue(new JsonObject().put("value", String.valueOf(reply.body())), replyBodyType);
               }
 
-              EventBusMessage response = EventBusMessage.newBuilder()
+              EventBusMessage.Builder response = EventBusMessage.newBuilder()
                 .putAllHeaders(responseHeaders)
-                .setBody(replyBody)
-                .build();
+                .setBody(replyBody);
 
-              request.response().end(response);
+              if (reply.replyAddress() != null) {
+                response.setReplyAddress(replies.createReply(reply));
+              }
+
+              request.response().end(response.build());
             })
             .onFailure(err -> {
               EventBusMessage response = handleErrorAndCreateResponse(err);

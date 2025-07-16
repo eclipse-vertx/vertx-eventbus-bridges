@@ -7,6 +7,7 @@ import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.json.JsonObject;
 import io.vertx.eventbus.bridge.grpc.BridgeEvent;
 import io.vertx.eventbus.bridge.grpc.impl.EventBusBridgeHandlerBase;
+import io.vertx.eventbus.bridge.grpc.impl.ReplyManager;
 import io.vertx.ext.bridge.BridgeEventType;
 import io.vertx.ext.bridge.BridgeOptions;
 import io.vertx.grpc.common.*;
@@ -24,8 +25,9 @@ public class EventBusBridgeSendHandler extends EventBusBridgeHandlerBase<SendOp,
     GrpcMessageEncoder.encoder(),
     GrpcMessageDecoder.decoder(SendOp.newBuilder()));
 
-  public EventBusBridgeSendHandler(EventBus bus, BridgeOptions options, Handler<BridgeEvent> bridgeEventHandler, Map<String, Pattern> compiledREs) {
-    super(bus, options, bridgeEventHandler, compiledREs);
+  public EventBusBridgeSendHandler(EventBus bus, BridgeOptions options, Handler<BridgeEvent> bridgeEventHandler,
+                                   ReplyManager replies, Map<String, Pattern> compiledREs) {
+    super(bus, options, bridgeEventHandler, replies, compiledREs);
   }
 
   @Override
@@ -48,23 +50,10 @@ public class EventBusBridgeSendHandler extends EventBusBridgeHandlerBase<SendOp,
       checkCallHook(BridgeEventType.SEND, eventJson,
         () -> {
           DeliveryOptions deliveryOptions = createDeliveryOptions(eventRequest.getHeadersMap());
-
-          if (!eventRequest.getReplyAddress().isEmpty()) {
-            bus.request(address, body, deliveryOptions)
-              .onSuccess(reply -> {
-                if (reply.replyAddress() != null) {
-                  replies.put(reply.replyAddress(), reply);
-                }
-
-                request.response().end(Empty.getDefaultInstance());
-              })
-              .onFailure(err -> {
-                replyStatus(request, GrpcStatus.INTERNAL, err.getMessage());
-              });
-          } else {
+          if (!replies.tryReply(address, body, deliveryOptions)) {
             bus.send(address, body, deliveryOptions);
-            request.response().end(Empty.getDefaultInstance());
           }
+          request.response().end(Empty.getDefaultInstance());
         },
         () -> replyStatus(request, GrpcStatus.PERMISSION_DENIED));
     });
@@ -81,11 +70,6 @@ public class EventBusBridgeSendHandler extends EventBusBridgeHandlerBase<SendOp,
     // Add address if present
     if (!request.getAddress().isEmpty()) {
       event.put("address", request.getAddress());
-    }
-
-    // Add reply address if present
-    if (!request.getReplyAddress().isEmpty()) {
-      event.put("replyAddress", request.getReplyAddress());
     }
 
     // Add headers if present

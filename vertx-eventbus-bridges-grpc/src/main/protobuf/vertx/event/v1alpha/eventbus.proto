@@ -52,17 +52,14 @@ message SendOp {
   // The address the message was sent to
   string address = 1;
 
-  // Optional reply address
-  string reply_address = 2;
-
   // Message headers
-  map<string, string> headers = 3;
+  map<string, string> headers = 2;
 
   // Message payload
-  JsonValue body = 4;
+  JsonValue body = 3;
 
   // Timeout in milliseconds
-  google.protobuf.Duration timeout = 5;
+  google.protobuf.Duration timeout = 4;
 }
 
 // Message used for request-reply pattern

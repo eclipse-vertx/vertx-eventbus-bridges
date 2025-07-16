@@ -8,6 +8,7 @@ import io.vertx.core.http.HttpClosedException;
 import io.vertx.core.json.JsonObject;
 import io.vertx.eventbus.bridge.grpc.BridgeEvent;
 import io.vertx.eventbus.bridge.grpc.impl.EventBusBridgeHandlerBase;
+import io.vertx.eventbus.bridge.grpc.impl.ReplyManager;
 import io.vertx.ext.bridge.BridgeEventType;
 import io.vertx.ext.bridge.BridgeOptions;
 import io.vertx.grpc.common.*;
@@ -43,8 +44,8 @@ public class EventBusBridgeSubscribeHandler extends EventBusBridgeHandlerBase<Su
     GrpcMessageDecoder.decoder(SubscribeOp.newBuilder()));
 
   public EventBusBridgeSubscribeHandler(EventBus bus, BridgeOptions options, Handler<BridgeEvent> bridgeEventHandler,
-                                        Map<String, Pattern> compiledREs) {
-    super(bus, options, bridgeEventHandler, compiledREs);
+                                        ReplyManager replies, Map<String, Pattern> compiledREs) {
+    super(bus, options, bridgeEventHandler, replies, compiledREs);
   }
 
   @Override
@@ -118,7 +119,8 @@ public class EventBusBridgeSubscribeHandler extends EventBusBridgeHandlerBase<Su
     return event;
   }
 
-  static final class BridgeMessageConsumer implements Handler<Message<Object>> {
+  final class BridgeMessageConsumer implements Handler<Message<Object>> {
+
     private final GrpcServerRequest<SubscribeOp, EventBusMessage> request;
     private final String address;
     private final String consumerId;
@@ -155,9 +157,8 @@ public class EventBusBridgeSubscribeHandler extends EventBusBridgeHandlerBase<Su
         .setBody(body)
         .build();
 
-      if (message.replyAddress() != null) {
-        response = response.toBuilder().setReplyAddress(message.replyAddress()).build();
-        replies.put(message.replyAddress(), message);
+      if (message.replyAddress() != null) {;
+        response = response.toBuilder().setReplyAddress(replies.createReply(message)).build();
       }
 
       request.resume();

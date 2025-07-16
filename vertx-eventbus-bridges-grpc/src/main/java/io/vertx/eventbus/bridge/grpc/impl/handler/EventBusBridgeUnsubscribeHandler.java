@@ -6,9 +6,9 @@ import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.json.JsonObject;
 import io.vertx.eventbus.bridge.grpc.BridgeEvent;
 import io.vertx.eventbus.bridge.grpc.impl.EventBusBridgeHandlerBase;
+import io.vertx.eventbus.bridge.grpc.impl.ReplyManager;
 import io.vertx.ext.bridge.BridgeEventType;
 import io.vertx.ext.bridge.BridgeOptions;
-import io.vertx.grpc.client.GrpcClientRequest;
 import io.vertx.grpc.common.*;
 import io.vertx.grpc.event.v1alpha.UnsubscribeOp;
 import io.vertx.grpc.server.GrpcServerRequest;
@@ -27,8 +27,9 @@ public class EventBusBridgeUnsubscribeHandler extends EventBusBridgeHandlerBase<
   private final EventBusBridgeSubscribeHandler subscribeHandler;
 
   public EventBusBridgeUnsubscribeHandler(EventBus bus, BridgeOptions options, Handler<BridgeEvent> bridgeEventHandler,
-                                          Map<String, Pattern> compiledREs, EventBusBridgeSubscribeHandler subscribeHandler) {
-    super(bus, options, bridgeEventHandler, compiledREs);
+                                          ReplyManager replies, Map<String, Pattern> compiledREs,
+                                          EventBusBridgeSubscribeHandler subscribeHandler) {
+    super(bus, options, bridgeEventHandler, replies, compiledREs);
 
     this.subscribeHandler = subscribeHandler;
   }

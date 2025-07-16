@@ -27,7 +27,7 @@ public interface GrpcEventBusBridgeService extends Service {
    * @param options the bridge options for controlling access to the EventBus
    * @return a new instance of GrpcEventBusBridgeService
    */
-  static GrpcEventBusBridgeService create(EventBus eventBus, BridgeOptions options) {
+  static GrpcEventBusBridgeService create(EventBus eventBus, GrpcBridgeOptions options) {
     return create(eventBus, options, null);
   }
 
@@ -39,7 +39,7 @@ public interface GrpcEventBusBridgeService extends Service {
    * @param bridgeEventHandler a handler for bridge events that can be used to implement custom security logic
    * @return a new instance of GrpcEventBusBridgeService
    */
-  static GrpcEventBusBridgeService create(EventBus eventBus, BridgeOptions options, Handler<BridgeEvent> bridgeEventHandler) {
+  static GrpcEventBusBridgeService create(EventBus eventBus, GrpcBridgeOptions options, Handler<BridgeEvent> bridgeEventHandler) {
     return new GrpcEventBusBridgeServiceImpl(eventBus, options, bridgeEventHandler);
   }
 }

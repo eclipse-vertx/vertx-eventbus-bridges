@@ -10,6 +10,7 @@ import io.vertx.core.eventbus.Message;
 import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
 import io.vertx.eventbus.bridge.grpc.BridgeEvent;
+import io.vertx.eventbus.bridge.grpc.GrpcBridgeOptions;
 import io.vertx.eventbus.bridge.grpc.GrpcEventBusBridge;
 import io.vertx.ext.bridge.BridgeOptions;
 import io.vertx.ext.bridge.PermittedOptions;
@@ -22,6 +23,9 @@ import junit.framework.AssertionFailedError;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.runner.RunWith;
+
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 
 @RunWith(VertxUnitRunner.class)
 public abstract class GrpcEventBusBridgeTestBase {
@@ -106,14 +110,17 @@ public abstract class GrpcEventBusBridgeTestBase {
 
     bridge = GrpcEventBusBridge.create(
       vertx,
-      new BridgeOptions()
+      new GrpcBridgeOptions()
+        .setReplyTimeout(Duration.of(3, ChronoUnit.SECONDS))
         .addInboundPermitted(new PermittedOptions().setAddress("hello"))
         .addInboundPermitted(new PermittedOptions().setAddress("echo"))
         .addInboundPermitted(new PermittedOptions().setAddress("test"))
         .addInboundPermitted(new PermittedOptions().setAddress("complex-ping"))
+        .addInboundPermitted(new PermittedOptions().setAddress("the-address"))
         .addOutboundPermitted(new PermittedOptions().setAddress("echo"))
         .addOutboundPermitted(new PermittedOptions().setAddress("test"))
         .addOutboundPermitted(new PermittedOptions().setAddress("ping"))
+        .addOutboundPermitted(new PermittedOptions().setAddress("the-address"))
         .addOutboundPermitted(new PermittedOptions().setAddress("complex-ping")),
       7000,
       event -> eventHandler.handle(event));
