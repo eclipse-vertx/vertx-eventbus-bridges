@@ -4,6 +4,7 @@ import com.google.protobuf.Empty;
 import com.google.protobuf.Value;
 import com.google.protobuf.util.Durations;
 import io.vertx.core.MultiMap;
+import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.eventbus.Message;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.net.SocketAddress;
@@ -436,49 +437,6 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
     });
   }
 
-    /*@Test
-    public void testStreamCancelation(TestContext context) {
-        final Async async = context.async();
-        final AtomicBoolean messageReceived = new AtomicBoolean(false);
-        final AtomicBoolean streamCanceled = new AtomicBoolean(false);
-        final AtomicReference<String> consumerId = new AtomicReference<>();
-
-        Handler<BridgeEvent> originalHandler = eventHandler;
-        eventHandler = event -> {
-            if (event.type() == BridgeEventType.UNREGISTER && messageReceived.get()) {
-                streamCanceled.set(true);
-
-                EventRequest secondUnsubRequest = EventRequest.newBuilder()
-                        .setAddress("ping")
-                        .setConsumer(consumerId.get())
-                        .build();
-
-                grpcClient.unsubscribe(secondUnsubRequest).onComplete(context.asyncAssertFailure(err -> {
-                    async.complete();
-                }));
-            }
-            originalHandler.handle(event);
-        };
-
-        EventRequest request = EventRequest.newBuilder().setAddress("ping").build();
-        grpcClient.subscribe(request).onComplete(context.asyncAssertSuccess(stream -> {
-            stream.handler(response -> {
-                context.assertFalse(response.hasStatus());
-                context.assertEquals("ping", response.getAddress());
-                context.assertNotNull(response.getBody());
-
-                Value body = response.getBody();
-                context.assertEquals("hi", body.getFieldsMap().get("value").getStringValue());
-
-                consumerId.set(response.getConsumer());
-                messageReceived.set(true);
-
-                // Cancel the stream properly through gRPC
-                // stream.endHandler(null);
-            });
-        })).timeout(10, TimeUnit.SECONDS);
-    }*/
-
   @Test
   public void testUnsubscribeWithoutReceivingMessage(TestContext context) {
     Async async = context.async();
@@ -793,6 +751,43 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
         grpcClient.unsubscribe(unsubRequest).onComplete(context.asyncAssertSuccess(unsubResponse -> async.complete()));
       }
     })));
+
+    async.awaitSuccess(5000);
+  }
+
+  @Test
+  public void testCancelSubscriptionStream(TestContext context) {
+    testSubscriptionStreamError(context, stream -> stream.request().cancel());
+  }
+
+  @Test
+  public void testCloseSubscriptionStream(TestContext context) {
+    testSubscriptionStreamError(context, stream -> stream.request().connection().close());
+  }
+
+  private void testSubscriptionStreamError(TestContext context, Consumer<GrpcClientResponse<?, ?>> failureHandler) {
+    Async async = context.async();
+    AtomicInteger messageCount = new AtomicInteger(0);
+
+    eventHandler = event -> {
+      switch (event.type()) {
+        case SOCKET_CLOSED:
+        case UNREGISTER:
+          async.complete();
+          break;
+      }
+      event.succeed(true);
+    };
+
+    SubscribeOp request = SubscribeOp.newBuilder().setAddress("ping").build();
+
+    grpcClient.subscribe(request).onComplete(context.asyncAssertSuccess(stream -> {
+      stream.handler(response -> {
+        if (messageCount.getAndIncrement() == 1) {
+          failureHandler.accept((GrpcClientResponse<?, ?>) stream);
+        }
+      });
+    }));
 
     async.awaitSuccess(5000);
   }

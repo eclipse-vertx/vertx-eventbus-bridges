@@ -8,6 +8,7 @@ import io.vertx.eventbus.bridge.grpc.BridgeEvent;
 import io.vertx.eventbus.bridge.grpc.impl.EventBusBridgeHandlerBase;
 import io.vertx.ext.bridge.BridgeEventType;
 import io.vertx.ext.bridge.BridgeOptions;
+import io.vertx.grpc.client.GrpcClientRequest;
 import io.vertx.grpc.common.*;
 import io.vertx.grpc.event.v1alpha.UnsubscribeOp;
 import io.vertx.grpc.server.GrpcServerRequest;
@@ -46,7 +47,9 @@ public class EventBusBridgeUnsubscribeHandler extends EventBusBridgeHandlerBase<
 
       checkCallHook(BridgeEventType.UNREGISTER, eventJson,
         () -> {
-          if (subscribeHandler.unregisterConsumer(consumerId)) {
+          GrpcServerRequest<?, ?> r;
+          if ((r = subscribeHandler.unregisterConsumer(consumerId)) != null) {
+            r.response().end();
             request.response().end(Empty.getDefaultInstance());
           } else {
             request.response().status(GrpcStatus.NOT_FOUND).end();

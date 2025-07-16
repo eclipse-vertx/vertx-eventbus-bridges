@@ -4,6 +4,7 @@ import io.vertx.core.Handler;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.eventbus.Message;
 import io.vertx.core.eventbus.MessageConsumer;
+import io.vertx.core.http.HttpClosedException;
 import io.vertx.core.json.JsonObject;
 import io.vertx.eventbus.bridge.grpc.BridgeEvent;
 import io.vertx.eventbus.bridge.grpc.impl.EventBusBridgeHandlerBase;
@@ -76,12 +77,22 @@ public class EventBusBridgeSubscribeHandler extends EventBusBridgeHandlerBase<Su
 
           subscriptions.put(consumerId, subscription);
 
-          request.exceptionHandler(err -> {
-            unregisterConsumer(consumerId);
+          request.errorHandler(err -> onError(consumerId, err.status == GrpcStatus.CANCELLED ? BridgeEventType.UNREGISTER : BridgeEventType.SOCKET_CLOSED));
+          request.response().exceptionHandler(err -> {
+            err.printStackTrace();
+            BridgeEventType type = err instanceof HttpClosedException ? BridgeEventType.SOCKET_CLOSED : BridgeEventType.SOCKET_ERROR;
+            onError(consumerId, type);
           });
        },
         () -> replyStatus(request, GrpcStatus.PERMISSION_DENIED));
     });
+  }
+
+  private void onError(String consumerId, BridgeEventType type) {
+    Runnable action = () -> {
+      unregisterConsumer(consumerId);
+    };
+    checkCallHook(type, new JsonObject(), action, action);
   }
 
   @Override
@@ -164,14 +175,13 @@ public class EventBusBridgeSubscribeHandler extends EventBusBridgeHandlerBase<Su
    * @param consumerId the unique ID of the consumer to unregister
    * @return true if the consumer was found and unregistered, false otherwise
    */
-  protected boolean unregisterConsumer(String consumerId) {
+  protected GrpcServerRequest<SubscribeOp, EventBusMessage> unregisterConsumer(String consumerId) {
     Subscription subscription = subscriptions.remove(consumerId);
     if (subscription != null) {
-      subscription.request.response().end();
       subscription.consumer.unregister();
-      return true;
+      return subscription.request;
     } else {
-      return false;
+      return null;
     }
   }
 }
