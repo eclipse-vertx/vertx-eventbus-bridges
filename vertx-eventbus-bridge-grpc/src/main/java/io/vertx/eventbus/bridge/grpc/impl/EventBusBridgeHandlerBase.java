@@ -26,6 +26,7 @@ import io.vertx.grpc.server.GrpcServerRequest;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
@@ -59,19 +60,15 @@ public abstract class EventBusBridgeHandlerBase<Req, Resp> implements Handler<Gr
    * @param payload a {@link JsonValue} to convert
    * @return a JSON object representing the message
    */
-  protected static Object protoToJson(JsonValue payload) {
+  protected static Object protoToJson(JsonValue payload) throws Exception {
     switch (payload.getValueCase()) {
       case TEXT:
         return Json.decodeValue(payload.getText());
       case BINARY:
         return Json.decodeValue(Buffer.buffer(payload.getBinary().toByteArray()));
       case PROTO: {
-        try {
-          String jsonString = JsonFormat.printer().print(payload.getProto());
-          return Json.decodeValue(jsonString);
-        } catch (Exception ignored) {
-          throw new UnsupportedOperationException("Handle me");
-        }
+        String jsonString = JsonFormat.printer().print(payload.getProto());
+        return Json.decodeValue(jsonString);
       }
       default:
         throw new IllegalArgumentException("Invalid payload body case: " + payload.getValueCase());

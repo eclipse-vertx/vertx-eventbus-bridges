@@ -45,7 +45,14 @@ public class EventBusBridgeRequestHandler extends EventBusBridgeHandlerBase<Requ
         return;
       }
 
-      Object body = protoToJson(eventRequest.getBody());
+      Object body;
+      try {
+        body = protoToJson(eventRequest.getBody());
+      } catch (Exception e) {
+        replyStatus(request, GrpcStatus.INVALID_ARGUMENT, "Invalid body");
+        return;
+      }
+
       JsonObject eventJson = createEvent("send", eventRequest);
 
       if (!checkMatches(true, address)) {
