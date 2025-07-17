@@ -7,6 +7,7 @@ import io.vertx.core.eventbus.Message;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.net.SocketAddress;
 import io.vertx.core.streams.ReadStream;
+import io.vertx.ext.bridge.BridgeEventType;
 import io.vertx.ext.unit.Async;
 import io.vertx.ext.unit.TestContext;
 import io.vertx.grpc.client.GrpcClient;
@@ -65,10 +66,14 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
   }
 
   private <T> T testSendWithBody(JsonValue payload) throws Exception {
-    CompletableFuture<T> body = consumeEventBusMessage();
+    return testSendWithBody("test", payload);
+  }
+
+  private <T> T testSendWithBody(String address, JsonValue payload) throws Exception {
+    CompletableFuture<T> body = consumeEventBusMessage(address);
 
     SendOp request = SendOp.newBuilder()
-      .setAddress("test")
+      .setAddress(address)
       .setBody(payload)
       .build();
 
@@ -82,10 +87,14 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
   }
 
   private <T> T testPublishWithBody(JsonValue payload) throws Exception {
-    CompletableFuture<T> body = consumeEventBusMessage();
+    return testPublishWithBody("test", payload);
+  }
+
+  private <T> T testPublishWithBody(String address, JsonValue payload) throws Exception {
+    CompletableFuture<T> body = consumeEventBusMessage(address);
 
     PublishOp request = PublishOp.newBuilder()
-      .setAddress("test")
+      .setAddress(address)
       .setBody(payload)
       .build();
 
@@ -94,10 +103,10 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
     return body.get(5, TimeUnit.SECONDS);
   }
 
-  private <T> CompletableFuture<T> consumeEventBusMessage() throws Exception {
+  private <T> CompletableFuture<T> consumeEventBusMessage(String address) {
     CompletableFuture<T> body = new CompletableFuture<>();
 
-    vertx.eventBus().consumer("test", (Message<T> msg) -> {
+    vertx.eventBus().consumer(address, (Message<T> msg) -> {
       body.complete(msg.body());
     });
 
@@ -109,13 +118,16 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
   }
 
   private <T> T testRequestWithBody(JsonValue body) {
+    return testRequestWithBody("hello", body);
+  }
+
+  private <T> T testRequestWithBody(String address, JsonValue body) {
     RequestOp request = RequestOp.newBuilder()
-      .setAddress("hello")
+      .setAddress(address)
       .setBody(body)
       .setTimeout(Durations.fromMillis(5000))
       .build();
     EventBusMessage response = grpcClient.request(request).await();
-    assertFalse(response.hasStatus());
     return valueToJson(response.getBody());
   }
 
@@ -224,6 +236,63 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
   }
 
   @Test
+  public void testSendToUnPermittedAddress() throws Exception {
+    try {
+      testSendWithBody("not-declared", JsonValue.newBuilder().setText("{}").build());
+      fail();
+    } catch (InvalidStatusException e) {
+      assertEquals(GrpcStatus.PERMISSION_DENIED, e.actualStatus());
+    }
+  }
+
+  @Test
+  public void testSendToUnauthorizedAddress() throws Exception {
+    AtomicInteger checks = new AtomicInteger();
+    eventHandler = event -> {
+      if (event.type() == BridgeEventType.SEND && event.getRawMessage().getString("address").equals("test")) {
+        checks.incrementAndGet();
+        event.succeed(false);
+      } else {
+        event.succeed(true);
+      }
+    };
+    try {
+      testSendWithBody("test", JsonValue.newBuilder().setText("{}").build());
+      fail();
+    } catch (InvalidStatusException e) {
+      assertEquals(GrpcStatus.PERMISSION_DENIED, e.actualStatus());
+      assertEquals(1, checks.get());
+    }
+  }
+
+  @Test
+  public void testSendToUnregisteredAddress() {
+    try {
+      SendOp request = SendOp.newBuilder()
+        .setAddress("test")
+        .setBody(JsonValue.newBuilder().setText("{}").build())
+        .build();
+      grpcClient.send(request).await();
+      fail();
+    } catch (InvalidStatusException e) {
+      assertEquals(GrpcStatus.NOT_FOUND, e.actualStatus());
+    }
+  }
+
+  @Test
+  public void testSendWithMissingAddress() {
+    try {
+      SendOp request = SendOp.newBuilder()
+        .setBody(JsonValue.newBuilder().setText("{}").build())
+        .build();
+      grpcClient.send(request).await();
+      fail();
+    } catch (InvalidStatusException e) {
+      assertEquals(GrpcStatus.INVALID_ARGUMENT, e.actualStatus());
+    }
+  }
+
+  @Test
   public void testRequest() {
     JsonObject requestBody = new JsonObject()
       .put("value", "vert.x")
@@ -294,6 +363,63 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
   public void testRequestWithInvalidBody() throws Exception {
     try {
       testRequestWithBody(JsonValue.newBuilder().setText("ABC").build());
+      fail();
+    } catch (InvalidStatusException e) {
+      assertEquals(GrpcStatus.INVALID_ARGUMENT, e.actualStatus());
+    }
+  }
+
+  @Test
+  public void testRequestToUnPermittedAddress() throws Exception {
+    try {
+      testRequestWithBody("not-declared", JsonValue.newBuilder().setText("{}").build());
+      fail();
+    } catch (InvalidStatusException e) {
+      assertEquals(GrpcStatus.PERMISSION_DENIED, e.actualStatus());
+    }
+  }
+
+  @Test
+  public void testRequestToUnauthorizedAddress() throws Exception {
+    AtomicInteger checks = new AtomicInteger();
+    eventHandler = event -> {
+      if (event.type() == BridgeEventType.SEND && event.getRawMessage().getString("address").equals("hello")) {
+        checks.incrementAndGet();
+        event.succeed(false);
+      } else {
+        event.succeed(true);
+      }
+    };
+    try {
+      testRequestWithBody("hello", JsonValue.newBuilder().setText("{}").build());
+      fail();
+    } catch (InvalidStatusException e) {
+      assertEquals(GrpcStatus.PERMISSION_DENIED, e.actualStatus());
+      assertEquals(1, checks.get());
+    }
+  }
+
+  @Test
+  public void testRequestToUnregisteredAddress() {
+    try {
+      RequestOp request = RequestOp.newBuilder()
+        .setAddress("test")
+        .setBody(JsonValue.newBuilder().setText("{}").build())
+        .build();
+      grpcClient.request(request).await();
+      fail();
+    } catch (InvalidStatusException e) {
+      assertEquals(GrpcStatus.NOT_FOUND, e.actualStatus());
+    }
+  }
+
+  @Test
+  public void testRequestWithMissingAddress() {
+    try {
+      RequestOp request = RequestOp.newBuilder()
+        .setBody(JsonValue.newBuilder().setText("{}").build())
+        .build();
+      grpcClient.request(request).await();
       fail();
     } catch (InvalidStatusException e) {
       assertEquals(GrpcStatus.INVALID_ARGUMENT, e.actualStatus());
@@ -521,6 +647,63 @@ public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
   public void testPublishWithInvalidBody() throws Exception {
     try {
       testPublishWithBody(JsonValue.newBuilder().setText("ABC").build());
+      fail();
+    } catch (InvalidStatusException e) {
+      assertEquals(GrpcStatus.INVALID_ARGUMENT, e.actualStatus());
+    }
+  }
+
+  @Test
+  public void testPublishToUnPermittedAddress() throws Exception {
+    try {
+      testPublishWithBody("not-declared", JsonValue.newBuilder().setText("{}").build());
+      fail();
+    } catch (InvalidStatusException e) {
+      assertEquals(GrpcStatus.PERMISSION_DENIED, e.actualStatus());
+    }
+  }
+
+  @Test
+  public void testPublishToUnauthorizedAddress() throws Exception {
+    AtomicInteger checks = new AtomicInteger();
+    eventHandler = event -> {
+      if (event.type() == BridgeEventType.PUBLISH && event.getRawMessage().getString("address").equals("hello")) {
+        checks.incrementAndGet();
+        event.succeed(false);
+      } else {
+        event.succeed(true);
+      }
+    };
+    try {
+      testPublishWithBody("hello", JsonValue.newBuilder().setText("{}").build());
+      fail();
+    } catch (InvalidStatusException e) {
+      assertEquals(GrpcStatus.PERMISSION_DENIED, e.actualStatus());
+      assertEquals(1, checks.get());
+    }
+  }
+
+  @Test
+  public void testPublishToUnregisteredAddress() {
+    try {
+      PublishOp op = PublishOp.newBuilder()
+        .setAddress("test")
+        .setBody(JsonValue.newBuilder().setText("{}").build())
+        .build();
+      grpcClient.publish(op).await();
+      fail();
+    } catch (InvalidStatusException e) {
+      assertEquals(GrpcStatus.NOT_FOUND, e.actualStatus());
+    }
+  }
+
+  @Test
+  public void testPublishWithMissingAddress() {
+    try {
+      RequestOp request = RequestOp.newBuilder()
+        .setBody(JsonValue.newBuilder().setText("{}").build())
+        .build();
+      grpcClient.request(request).await();
       fail();
     } catch (InvalidStatusException e) {
       assertEquals(GrpcStatus.INVALID_ARGUMENT, e.actualStatus());

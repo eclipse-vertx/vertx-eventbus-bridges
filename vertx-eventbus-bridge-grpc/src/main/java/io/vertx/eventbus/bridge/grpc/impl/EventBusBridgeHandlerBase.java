@@ -281,27 +281,6 @@ public abstract class EventBusBridgeHandlerBase<Req, Resp> implements Handler<Gr
   }
 
   /**
-   * Handles an error and creates a response message.
-   * <p>
-   * This method is used to handle errors that occur during processing. It creates a response message with the appropriate status code and message.
-   *
-   * @param error the error that occurred
-   * @return a response message with the error details
-   */
-  protected EventBusMessage handleErrorAndCreateResponse(Throwable error) {
-    if (error instanceof ReplyException) {
-      ReplyException replyEx = (ReplyException) error;
-      return EventBusMessage.newBuilder()
-        .setStatus(Status.newBuilder().setCode(replyEx.failureCode()).setMessage(replyEx.getMessage()).build())
-        .build();
-    } else {
-      return EventBusMessage.newBuilder()
-        .setStatus(Status.newBuilder().setCode(500).setMessage(error.getMessage()).build())
-        .build();
-    }
-  }
-
-  /**
    * Creates a JSON object representing a bridge event from a gRPC request.
    *
    * This method extracts information from the request and puts it into a JSON object that can be used for bridge event processing.

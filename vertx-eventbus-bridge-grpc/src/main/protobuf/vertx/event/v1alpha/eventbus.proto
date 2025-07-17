@@ -116,9 +116,6 @@ message EventBusMessage {
 
   // Message payload
   JsonValue body = 5;
-
-  // Optional status for error responses
-  google.rpc.Status status = 6;
 }
 
 enum JsonValueFormat {

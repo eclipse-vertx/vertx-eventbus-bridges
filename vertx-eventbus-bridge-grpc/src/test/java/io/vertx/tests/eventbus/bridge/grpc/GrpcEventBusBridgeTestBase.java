@@ -34,7 +34,7 @@ public abstract class GrpcEventBusBridgeTestBase {
   protected Vertx vertx;
   protected GrpcEventBusBridge bridge;
   protected HttpServer server;
-  protected volatile Handler<BridgeEvent> eventHandler = event -> event.complete(true);
+  protected volatile Handler<BridgeEvent> eventHandler;
 
   /**
    * Convert a Json value to a JsonPayload
@@ -104,6 +104,7 @@ public abstract class GrpcEventBusBridgeTestBase {
 
   @Before
   public void before() {
+    eventHandler = event -> event.complete(true);
     vertx = Vertx.vertx();
 
     vertx.eventBus().consumer("hello", (Message<JsonObject> msg) -> msg.reply(new JsonObject().put("value", "Hello " + msg.body().getString("value"))));

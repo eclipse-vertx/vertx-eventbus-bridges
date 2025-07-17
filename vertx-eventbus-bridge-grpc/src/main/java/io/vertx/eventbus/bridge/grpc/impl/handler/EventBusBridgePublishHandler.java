@@ -4,6 +4,8 @@ import com.google.protobuf.Empty;
 import io.vertx.core.Handler;
 import io.vertx.core.eventbus.DeliveryOptions;
 import io.vertx.core.eventbus.EventBus;
+import io.vertx.core.eventbus.MessageProducer;
+import io.vertx.core.eventbus.ReplyException;
 import io.vertx.core.json.JsonObject;
 import io.vertx.eventbus.bridge.grpc.BridgeEvent;
 import io.vertx.eventbus.bridge.grpc.impl.EventBusBridgeHandlerBase;
@@ -56,8 +58,22 @@ public class EventBusBridgePublishHandler extends EventBusBridgeHandlerBase<Publ
       checkCallHook(BridgeEventType.PUBLISH, eventJson,
         () -> {
           DeliveryOptions deliveryOptions = createDeliveryOptions(eventRequest.getHeadersMap());
-          bus.publish(address, body, deliveryOptions);
-          request.response().end(Empty.getDefaultInstance());
+          MessageProducer<Object> publisher = bus.publisher(address, deliveryOptions);
+          publisher.write(body).onComplete(ar -> {
+            if (ar.succeeded()) {
+              request.response().end(Empty.getDefaultInstance());
+            } else if (ar.cause() instanceof ReplyException) {
+              ReplyException replyException = (ReplyException) ar.cause();
+              switch (replyException.failureType()) {
+                case NO_HANDLERS:
+                  replyStatus(request, GrpcStatus.NOT_FOUND);
+                  break;
+                default:
+                  request.response().end(Empty.getDefaultInstance());
+                  break;
+              }
+            }
+          });
         },
         () -> replyStatus(request, GrpcStatus.PERMISSION_DENIED));
     });

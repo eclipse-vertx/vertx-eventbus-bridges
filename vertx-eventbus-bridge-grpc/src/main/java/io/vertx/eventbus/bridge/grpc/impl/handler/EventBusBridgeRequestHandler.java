@@ -4,6 +4,7 @@ import com.google.protobuf.util.Durations;
 import io.vertx.core.Handler;
 import io.vertx.core.eventbus.DeliveryOptions;
 import io.vertx.core.eventbus.EventBus;
+import io.vertx.core.eventbus.ReplyException;
 import io.vertx.core.json.JsonObject;
 import io.vertx.eventbus.bridge.grpc.BridgeEvent;
 import io.vertx.eventbus.bridge.grpc.impl.EventBusBridgeHandlerBase;
@@ -98,8 +99,18 @@ public class EventBusBridgeRequestHandler extends EventBusBridgeHandlerBase<Requ
               request.response().end(response.build());
             })
             .onFailure(err -> {
-              EventBusMessage response = handleErrorAndCreateResponse(err);
-              request.response().end(response);
+              if (err instanceof ReplyException) {
+                ReplyException replyException = (ReplyException) err;
+                switch (replyException.failureType()) {
+                  case NO_HANDLERS:
+                    replyStatus(request, GrpcStatus.NOT_FOUND);
+                    return;
+                  case TIMEOUT:
+                    replyStatus(request, GrpcStatus.DEADLINE_EXCEEDED);
+                    return;
+                }
+              }
+              replyStatus(request, GrpcStatus.UNKNOWN);
             });
         },
         () -> replyStatus(request, GrpcStatus.PERMISSION_DENIED));

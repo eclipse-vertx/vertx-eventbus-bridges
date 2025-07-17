@@ -4,6 +4,8 @@ import com.google.protobuf.Empty;
 import io.vertx.core.Handler;
 import io.vertx.core.eventbus.DeliveryOptions;
 import io.vertx.core.eventbus.EventBus;
+import io.vertx.core.eventbus.MessageProducer;
+import io.vertx.core.eventbus.ReplyException;
 import io.vertx.core.json.JsonObject;
 import io.vertx.eventbus.bridge.grpc.BridgeEvent;
 import io.vertx.eventbus.bridge.grpc.impl.EventBusBridgeHandlerBase;
@@ -57,9 +59,25 @@ public class EventBusBridgeSendHandler extends EventBusBridgeHandlerBase<SendOp,
         () -> {
           DeliveryOptions deliveryOptions = createDeliveryOptions(eventRequest.getHeadersMap());
           if (!replies.tryReply(address, body, deliveryOptions)) {
-            bus.send(address, body, deliveryOptions);
+            MessageProducer<Object> sender = bus.sender(address, deliveryOptions);
+            sender.write(body).onComplete(ar -> {
+              if (ar.succeeded()) {
+                request.response().end(Empty.getDefaultInstance());
+              } else if (ar.cause() instanceof ReplyException) {
+                ReplyException replyException = (ReplyException) ar.cause();
+                switch (replyException.failureType()) {
+                  case NO_HANDLERS:
+                    replyStatus(request, GrpcStatus.NOT_FOUND);
+                    break;
+                  default:
+                    request.response().end(Empty.getDefaultInstance());
+                    break;
+                }
+              }
+            });
+          } else {
+            request.response().end(Empty.getDefaultInstance());
           }
-          request.response().end(Empty.getDefaultInstance());
         },
         () -> replyStatus(request, GrpcStatus.PERMISSION_DENIED));
     });
