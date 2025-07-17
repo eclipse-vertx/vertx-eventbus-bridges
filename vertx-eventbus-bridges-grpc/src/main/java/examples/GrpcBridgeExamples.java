@@ -6,15 +6,16 @@ import com.google.protobuf.Empty;
 import com.google.protobuf.Struct;
 import com.google.protobuf.Value;
 import io.vertx.core.Vertx;
+import io.vertx.core.http.HttpServer;
 import io.vertx.core.http.HttpServerOptions;
 import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
+import io.vertx.core.net.JksOptions;
 import io.vertx.core.net.SocketAddress;
 import io.vertx.core.streams.ReadStream;
 import io.vertx.docgen.Source;
 import io.vertx.eventbus.bridge.grpc.GrpcBridgeOptions;
 import io.vertx.eventbus.bridge.grpc.GrpcEventBusBridge;
-import io.vertx.eventbus.bridge.grpc.GrpcEventBusBridgeService;
 import io.vertx.ext.bridge.PermittedOptions;
 import io.vertx.grpc.event.v1alpha.*;
 import io.vertx.grpc.server.GrpcServer;
@@ -31,19 +32,25 @@ public class GrpcBridgeExamples {
       .addOutboundPermitted(new PermittedOptions().setAddress("news"));
 
     // Create the bridge
-    GrpcEventBusBridge bridge = GrpcEventBusBridge.create(
-      vertx,
-      options,
-      7000,  // Port
-      event -> {
-        // Optional event handler for bridge events
-        System.out.println("Bridge event: " + event.type());
-        event.complete(true);
-      }
-    );
+    GrpcEventBusBridge bridge = GrpcEventBusBridge.create(vertx, options);
+
+    // Create the gRPC server
+    GrpcServer grpcServer = GrpcServer.server(vertx).addService(bridge);
+
+    // Add the server
+    grpcServer.addService(bridge);
+
+    HttpServer server = vertx
+      .createHttpServer(new HttpServerOptions()
+        .setSsl(true)
+        .setKeyCertOptions(new JksOptions()
+          .setPath("/path/to/keycert.jks")
+          .setPassword("the-password"))
+      )
+      .requestHandler(grpcServer);
 
     // Start the bridge
-    bridge.listen().onComplete(ar -> {
+    server.listen(443).onComplete(ar -> {
       if (ar.succeeded()) {
         System.out.println("gRPC EventBus Bridge started");
       } else {
@@ -244,99 +251,14 @@ public class GrpcBridgeExamples {
     return JsonValue.getDefaultInstance();
   }
 
-  public void createCustomServerWithBridgeService(Vertx vertx) {
-    // Configure bridge options
-    GrpcBridgeOptions options = new GrpcBridgeOptions()
-      .addInboundPermitted(new PermittedOptions().setAddress("hello"))
-      .addInboundPermitted(new PermittedOptions().setAddress("echo"))
-      .addOutboundPermitted(new PermittedOptions().setAddress("news"));
-
-    // Create the EventBus bridge service
-    GrpcEventBusBridgeService bridgeService = GrpcEventBusBridgeService.create(
-      vertx.eventBus(),
-      options,
-      event -> {
-        // Optional event handler for bridge events
-        System.out.println("Bridge event: " + event.type());
-        event.complete(true);
-      }
-    );
-
-    // Create a custom gRPC server
-    GrpcServer grpcServer = GrpcServer.server(vertx);
-
-    // Bind the bridge service to the gRPC server
-    bridgeService.bind(grpcServer);
-
-    // Create an HTTP server and use the gRPC server as request handler
-    vertx.createHttpServer()
-      .requestHandler(grpcServer)
-      .listen(7000)
-      .onComplete(ar -> {
-        if (ar.succeeded()) {
-          System.out.println("Custom gRPC server with EventBus bridge started on port 7000");
-        } else {
-          System.err.println("Failed to start custom gRPC server: " + ar.cause());
-        }
-      });
-  }
-
-  public void createServerWithMultipleServices(Vertx vertx, HttpServerOptions serverOptions) {
-    // Create a custom gRPC server
-    GrpcServer grpcServer = GrpcServer.server(vertx);
-
-    // Add your custom services first
-    // MyCustomService customService = new MyCustomService();
-    // customService.bind(grpcServer);
-    // AnotherCustomService anotherService = new AnotherCustomService();
-    // anotherService.bind(grpcServer);
-
-    // Configure and add the EventBus bridge service
-    GrpcBridgeOptions options = new GrpcBridgeOptions()
-      .addInboundPermitted(new PermittedOptions().setAddress("hello"))
-      .addOutboundPermitted(new PermittedOptions().setAddress("notifications"));
-
-    GrpcEventBusBridgeService bridgeService = GrpcEventBusBridgeService.create(
-      vertx.eventBus(),
-      options
-    );
-
-    // Bind the bridge service alongside your other services
-    bridgeService.bind(grpcServer);
-
-    // Create an HTTP server and use the gRPC server as request handler
-    vertx.createHttpServer(serverOptions)
-      .requestHandler(grpcServer)
-      .listen()
-      .onComplete(ar -> {
-        if (ar.succeeded()) {
-          System.out.println("gRPC server with multiple services started on port 8080");
-        } else {
-          System.err.println("Failed to start gRPC server: " + ar.cause());
-        }
-      });
-  }
-
-  public void createBridgeServiceWithAdvancedConfig(Vertx vertx, HttpServerOptions serverOptions) {
-    // Advanced bridge configuration
-    GrpcBridgeOptions options = new GrpcBridgeOptions()
-      // Inbound permissions (client -> EventBus)
-      .addInboundPermitted(new PermittedOptions().setAddress("api.users"))
-      .addInboundPermitted(new PermittedOptions().setAddress("api.orders"))
-      .addInboundPermitted(new PermittedOptions().setAddressRegex("api\\.notifications\\..*"))
-
-      // Outbound permissions (EventBus -> client)
-      .addOutboundPermitted(new PermittedOptions().setAddress("events.user.created"))
-      .addOutboundPermitted(new PermittedOptions().setAddress("events.order.updated"))
-      .addOutboundPermitted(new PermittedOptions().setAddressRegex("events\\.system\\..*"));
-
+  public void createBridgeServiceWithCustomEventHandler(Vertx vertx, HttpServerOptions serverOptions, GrpcBridgeOptions bridgeOptions) {
     // Create the bridge service with advanced event handling
-    GrpcEventBusBridgeService bridgeService = GrpcEventBusBridgeService.create(
-      vertx.eventBus(),
-      options,
-      event -> {
+    GrpcEventBusBridge bridgeService = GrpcEventBusBridge.builder(vertx)
+      .with(bridgeOptions)
+      .withEventHandler(bridgeEvent -> {
+
         // Advanced bridge event handling
-        switch (event.type()) {
+        switch (bridgeEvent.type()) {
           case SOCKET_CREATED:
             System.out.println("New gRPC client connected");
             break;
@@ -344,41 +266,25 @@ public class GrpcBridgeExamples {
             System.out.println("gRPC client disconnected");
             break;
           case SEND:
-            System.out.println("Message sent to: " + event.getRawMessage().getString("address"));
+            System.out.println("Message sent to: " + bridgeEvent.getRawMessage().getString("address"));
             break;
           case PUBLISH:
-            System.out.println("Message published to: " + event.getRawMessage().getString("address"));
+            System.out.println("Message published to: " + bridgeEvent.getRawMessage().getString("address"));
             break;
           case RECEIVE:
-            System.out.println("Message received from: " + event.getRawMessage().getString("address"));
+            System.out.println("Message received from: " + bridgeEvent.getRawMessage().getString("address"));
             break;
           case REGISTER:
-            System.out.println("Client registered for: " + event.getRawMessage().getString("address"));
+            System.out.println("Client registered for: " + bridgeEvent.getRawMessage().getString("address"));
             break;
           case UNREGISTER:
-            System.out.println("Client unregistered from: " + event.getRawMessage().getString("address"));
+            System.out.println("Client unregistered from: " + bridgeEvent.getRawMessage().getString("address"));
             break;
         }
 
         // Always complete the event to allow it to proceed
-        event.complete(true);
-      }
-    );
-
-    // Create and configure the server
-    GrpcServer grpcServer = GrpcServer.server(vertx);
-    bridgeService.bind(grpcServer);
-
-    // Create an HTTP server and use the gRPC server as request handler
-    vertx.createHttpServer(serverOptions)
-      .requestHandler(grpcServer)
-      .listen()
-      .onComplete(ar -> {
-        if (ar.succeeded()) {
-          System.out.println("Advanced gRPC EventBus bridge started on port 9000");
-        } else {
-          System.err.println("Failed to start advanced bridge: " + ar.cause());
-        }
-      });
+        bridgeEvent.complete(true);
+      })
+      .build();
   }
 }

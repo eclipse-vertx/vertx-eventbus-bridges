@@ -33,6 +33,116 @@ gRPC provides a modern, open-source RPC framework that uses HTTP/2 for transport
 
 The bridge also supports gRPC-Web, allowing web clients to communicate with the gRPC server.
 
+== Creating a gRPC EventBus Bridge Server
+
+You can create a gRPC EventBus Bridge server like this.
+
+[source,java]
+----
+{@link examples.GrpcBridgeExamples#createServer}
+----
+
+Creating the bridge involves a few steps:
+
+1. Creating the bridge with the proper inbound/outbound permissions
+2. Creating the gRPC server
+3. Adding the bridge to the gRPC server
+4. Creating the HTTP server hosting the gRPC server
+
+NOTE: You can refer to the https://vertx.io/docs/vertx-grpc/java/[Vert.x gRPC documentation] and https://vertx.io/docs/vertx-core/java/[Vert.x
+Core documentation] to learn more about Vert.x gRPC and HTTP servers.
+
+== Creating a Vert.x gRPC Client
+
+Here's how to create a gRPC client to connect to the bridge:
+
+[source,java]
+----
+{@link examples.GrpcBridgeExamples#createClient}
+----
+
+== Interacting with the bridge
+
+This section describes the interaction patterns with the gRPC bridge using the Vert.x gRPC Client.
+
+WARNING: Those patterns do not depend on the Vert.x gRPC Client. You can apply them to your own usage of gRPC with
+the EventBus rpc and messages defined by `eventbus.proto`.
+
+=== Sending Messages
+
+To send a message to an address:
+
+[source,java]
+----
+{@link examples.GrpcBridgeExamples#sendMessage}
+----
+
+=== Request-Response Pattern
+
+To send a request and receive a response:
+
+[source,java]
+----
+{@link examples.GrpcBridgeExamples#requestResponse}
+----
+
+=== Publishing Messages
+
+To publish a message to all subscribers:
+
+[source,java]
+----
+{@link examples.GrpcBridgeExamples#publishMessage}
+----
+
+=== Subscribing to Messages
+
+To subscribe to messages from an address:
+
+[source,java]
+----
+{@link examples.GrpcBridgeExamples#subscribeToMessages}
+----
+
+=== Unsubscribing from Messages
+
+To unsubscribe from an address:
+
+[source,java]
+----
+{@link examples.GrpcBridgeExamples#unsubscribeFromMessages}
+----
+
+=== Replying to message
+
+When an `EventBusMessage` carries a reply address, the sender of this message expects a reply.
+
+The reply address can be used to send the reply.
+
+[source,java]
+----
+{@link examples.GrpcBridgeExamples#replyingToAnEventBusMessage}
+----
+
+=== Health Check
+
+To perform a health check:
+
+[source,java]
+----
+{@link examples.GrpcBridgeExamples#healthCheck}
+----
+
+=== Bridge events
+
+The `GrpcEventBusBridge` supports a custom bridge event handler that allows to log bridge actions or perform
+custom access control:
+
+[source,java]
+----
+{@link examples.GrpcBridgeExamples#createBridgeServiceWithCustomEventHandler}
+----
+
 == Protocol Description
 
 The gRPC EventBus Bridge uses Protocol Buffers to define the service and message structures.
@@ -199,121 +309,4 @@ message EventBusMessage {
   // Optional status for error responses
   google.rpc.Status status = 6;
 }
-----
-
-== Usage Examples
-
-=== Creating a gRPC EventBus Bridge Server
-
-Here's an example of how to create and start a gRPC EventBus Bridge server:
-
-[source,java]
-----
-{@link examples.GrpcBridgeExamples#createServer}
-----
-
-=== Creating a gRPC Client
-
-Here's how to create a gRPC client to connect to the bridge:
-
-[source,java]
-----
-{@link examples.GrpcBridgeExamples#createClient}
-----
-
-=== Sending Messages
-
-To send a message to an address:
-
-[source,java]
-----
-{@link examples.GrpcBridgeExamples#sendMessage}
-----
-
-=== Request-Response Pattern
-
-To send a request and receive a response:
-
-[source,java]
-----
-{@link examples.GrpcBridgeExamples#requestResponse}
-----
-
-=== Publishing Messages
-
-To publish a message to all subscribers:
-
-[source,java]
-----
-{@link examples.GrpcBridgeExamples#publishMessage}
-----
-
-=== Subscribing to Messages
-
-To subscribe to messages from an address:
-
-[source,java]
-----
-{@link examples.GrpcBridgeExamples#subscribeToMessages}
-----
-
-=== Unsubscribing from Messages
-
-To unsubscribe from an address:
-
-[source,java]
-----
-{@link examples.GrpcBridgeExamples#unsubscribeFromMessages}
-----
-
-=== Replying to message
-
-When an `EventBusMessage` carries a reply address, the sender of this message expects a reply.
-
-The reply address can be used to send the reply.
-
-[source,java]
-----
-{@link examples.GrpcBridgeExamples#replyingToAnEventBusMessage}
-----
-
-=== Health Check
-
-To perform a health check:
-
-[source,java]
-----
-{@link examples.GrpcBridgeExamples#healthCheck}
-----
-
-== Using GrpcEventBusBridgeService with Custom gRPC Server
-
-While the previous examples show how to create a standalone gRPC EventBus Bridge server, you may want to integrate the EventBus bridge functionality into an existing custom gRPC server that already hosts other services.
-The `GrpcEventBusBridgeService` allows you to do exactly that.
-
-=== Integration with Custom gRPC Server
-
-Here's how to integrate the EventBus bridge service into your existing gRPC server:
-
-[source,java]
-----
-{@link examples.GrpcBridgeExamples#createCustomServerWithBridgeService}
-----
-
-=== Custom Server with Multiple Services
-
-You can easily combine the EventBus bridge with your own custom gRPC services:
-
-[source,java]
-----
-{@link examples.GrpcBridgeExamples#createServerWithMultipleServices}
-----
-
-=== Advanced Configuration
-
-The `GrpcEventBusBridgeService` supports the same configuration options as the standalone bridge:
-
-[source,java]
-----
-{@link examples.GrpcBridgeExamples#createBridgeServiceWithAdvancedConfig}
 ----

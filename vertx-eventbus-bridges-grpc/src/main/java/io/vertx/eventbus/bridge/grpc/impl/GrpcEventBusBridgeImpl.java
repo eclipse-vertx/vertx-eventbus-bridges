@@ -1,119 +1,60 @@
 package io.vertx.eventbus.bridge.grpc.impl;
 
-import io.vertx.core.Future;
+import com.google.protobuf.Descriptors;
 import io.vertx.core.Handler;
-import io.vertx.core.Promise;
-import io.vertx.core.Vertx;
 import io.vertx.core.eventbus.EventBus;
-import io.vertx.core.http.HttpServer;
-import io.vertx.core.http.HttpServerOptions;
-import io.vertx.core.internal.logging.Logger;
-import io.vertx.core.internal.logging.LoggerFactory;
 import io.vertx.eventbus.bridge.grpc.BridgeEvent;
 import io.vertx.eventbus.bridge.grpc.GrpcBridgeOptions;
 import io.vertx.eventbus.bridge.grpc.GrpcEventBusBridge;
-import io.vertx.ext.bridge.BridgeOptions;
+import io.vertx.eventbus.bridge.grpc.impl.handler.*;
+import io.vertx.grpc.common.ServiceName;
+import io.vertx.grpc.event.v1alpha.EventBusBridgeProto;
 import io.vertx.grpc.server.GrpcServer;
-import io.vertx.grpc.server.GrpcServerOptions;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
- * Implementation of the GrpcEventBusBridge interface.
- * <p>
- * This class sets up a gRPC server that bridges the Vert.x EventBus to external clients. It allows external applications to communicate with the Vert.x EventBus through gRPC,
- * enabling cross-platform and cross-language communication.
- * <p>
- * The bridge supports operations like publishing messages, sending requests, subscribing to addresses, and handling responses from the EventBus.
+ * The service implements the gRPC service defined in the protobuf file and exposes the EventBus operations through gRPC methods.
  */
 public class GrpcEventBusBridgeImpl implements GrpcEventBusBridge {
 
-  private static final Logger log = LoggerFactory.getLogger(GrpcEventBusBridgeImpl.class);
+  private static final ServiceName SERVICE_NAME = ServiceName.create("vertx.event.v1alpha.EventBusBridge");
+  private static final Descriptors.ServiceDescriptor SERVICE_DESCRIPTOR = EventBusBridgeProto.getDescriptor().findServiceByName("EventBusBridge");
 
-  private final Vertx vertx;
-  private final EventBus eb;
+  private final EventBus eventBus;
   private final GrpcBridgeOptions options;
   private final Handler<BridgeEvent> bridgeEventHandler;
-  private final int port;
-  private HttpServer server;
+  private final Map<String, Pattern> compiledREs = new HashMap<>();
+  private final ReplyManager replies;
 
-  public GrpcEventBusBridgeImpl(Vertx vertx, GrpcBridgeOptions options, int port, Handler<BridgeEvent> eventHandler) {
-    this.vertx = vertx;
-    this.eb = vertx.eventBus();
-    this.options = options != null ? options : new GrpcBridgeOptions();
-    this.bridgeEventHandler = eventHandler;
-    this.port = port;
-  }
-
-  public GrpcEventBusBridgeImpl(Vertx vertx, GrpcBridgeOptions options, int port) {
-    this(vertx, options, port, null);
+  public GrpcEventBusBridgeImpl(EventBus eventBus, GrpcBridgeOptions options, Handler<BridgeEvent> bridgeEventHandler) {
+    this.eventBus = eventBus;
+    this.options = options;
+    this.bridgeEventHandler = bridgeEventHandler;
+    this.replies = new ReplyManager(options.getReplyTimeout().toMillis());
   }
 
   @Override
-  public Future<GrpcEventBusBridge> listen() {
-    return listen(port);
+  public ServiceName name() {
+    return SERVICE_NAME;
   }
 
   @Override
-  public Future<GrpcEventBusBridge> listen(int port) {
-    return listen(port, "0.0.0.0");
+  public Descriptors.ServiceDescriptor descriptor() {
+    return SERVICE_DESCRIPTOR;
   }
 
   @Override
-  public Future<GrpcEventBusBridge> listen(int port, String host) {
-    Promise<GrpcEventBusBridge> promise = Promise.promise();
-
-    try {
-      // Create the EventBus bridge service that will handle gRPC requests
-      GrpcEventBusBridgeServiceImpl service = new GrpcEventBusBridgeServiceImpl(eb, options, bridgeEventHandler);
-
-      // Configure the HTTP server options
-      HttpServerOptions serverOptions = new HttpServerOptions()
-        .setPort(port)
-        .setHost(host);
-
-      // Create a gRPC server with gRPC-Web support enabled
-      GrpcServer grpcServer = GrpcServer.server(vertx, new GrpcServerOptions());
-
-      // Bind the service to the gRPC server
-      service.bind(grpcServer);
-
-      // Create and start the HTTP server
-      server = vertx.createHttpServer(serverOptions);
-      server.requestHandler(grpcServer);
-      server.listen().onComplete(res -> {
-        if (res.succeeded()) {
-          log.info("gRPC EventBus Bridge listening on " + host + ":" + port);
-          promise.complete(this);
-        } else {
-          log.error("Failed to start gRPC server", res.cause());
-          promise.fail(res.cause());
-        }
-      });
-    } catch (Exception e) {
-      log.error("Error setting up gRPC server", e);
-      promise.fail(e);
-    }
-
-    return promise.future();
-  }
-
-  @Override
-  public Future<Void> close() {
-    Promise<Void> promise = Promise.promise();
-    if (server != null) {
-      // Close the HTTP server if it exists
-      server.close().onComplete(res -> {
-        if (res.succeeded()) {
-          log.info("gRPC EventBus Bridge server closed successfully");
-          promise.complete();
-        } else {
-          log.error("Error shutting down gRPC server", res.cause());
-          promise.fail(res.cause());
-        }
-      });
-    } else {
-      // No server to close, complete immediately
-      promise.complete();
-    }
-    return promise.future();
+  public void bind(GrpcServer server) {
+    EventBusBridgeSubscribeHandler a;
+    // Register handlers for all supported operations
+    server.callHandler(EventBusBridgePublishHandler.SERVICE_METHOD, new EventBusBridgePublishHandler(eventBus, options, bridgeEventHandler, replies, compiledREs));
+    server.callHandler(EventBusBridgeSendHandler.SERVICE_METHOD, new EventBusBridgeSendHandler(eventBus, options, bridgeEventHandler, replies, compiledREs));
+    server.callHandler(EventBusBridgeRequestHandler.SERVICE_METHOD, new EventBusBridgeRequestHandler(eventBus, options, bridgeEventHandler, replies, compiledREs));
+    server.callHandler(EventBusBridgeSubscribeHandler.SERVICE_METHOD, a = new EventBusBridgeSubscribeHandler(eventBus, options, bridgeEventHandler, replies, compiledREs));
+    server.callHandler(EventBusBridgeUnsubscribeHandler.SERVICE_METHOD, new EventBusBridgeUnsubscribeHandler(eventBus, options, bridgeEventHandler, replies, compiledREs, a));
+    server.callHandler(EventBusBridgePingHandler.SERVICE_METHOD, new EventBusBridgePingHandler(eventBus, options, bridgeEventHandler, replies, compiledREs));
   }
 }

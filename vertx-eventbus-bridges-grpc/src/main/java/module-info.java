@@ -1,5 +1,6 @@
 module io.vertx.eventbusbridge.grpc {
 
+  requires static io.vertx.docgen;
   requires static io.vertx.codegen.api;
   requires static io.vertx.codegen.json;
 
@@ -11,8 +12,7 @@ module io.vertx.eventbusbridge.grpc {
   requires com.google.protobuf;
   requires com.google.protobuf.util;
   requires io.vertx.grpc.client;
-    requires io.vertx.docgen;
 
-    exports io.vertx.eventbus.bridge.grpc;
+  exports io.vertx.eventbus.bridge.grpc;
   exports io.vertx.grpc.event.v1alpha;
 }
