@@ -22,7 +22,6 @@ public class GrpcBridgeOptions extends BridgeOptions {
   /**
    * @return the reply timeout
    */
-  @GenIgnore(GenIgnore.PERMITTED_TYPE)
   public Duration getReplyTimeout() {
     return replyTimeout;
   }
@@ -37,7 +36,6 @@ public class GrpcBridgeOptions extends BridgeOptions {
    * @param replyTimeout the timeout
    * @return the reference to this object
    */
-  @GenIgnore(GenIgnore.PERMITTED_TYPE)
   public GrpcBridgeOptions setReplyTimeout(Duration replyTimeout) {
     this.replyTimeout = Objects.requireNonNull(replyTimeout);
     return this;
