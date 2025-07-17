@@ -1,0 +1,137 @@
+syntax = "proto3";
+
+package vertx.event.v1alpha;
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/duration.proto";
+import "google/rpc/status.proto";
+
+option java_multiple_files = true;
+option java_package = "io.vertx.grpc.event.v1alpha";
+option java_outer_classname = "EventBusBridgeProto";
+
+service EventBusBridge {
+
+  // Publish a message to an address
+  rpc Publish(PublishOp) returns (google.protobuf.Empty) {}
+
+  // Send a message to an address (point-to-point)
+  rpc Send(SendOp) returns (google.protobuf.Empty) {}
+
+  // Request-reply pattern
+  rpc Request(RequestOp) returns (EventBusMessage) {}
+
+  // Subscribe to messages from an address
+  // The server will forward any message received on the event-bus address
+  // To unsubscribe the Unsubscribe rpc should be called with the consumer
+  // The consumer ID is provided in the response headers as vertx-event-bus-consumer-id as well as in each of the received messages
+  rpc Subscribe(SubscribeOp) returns (stream EventBusMessage) {}
+
+  // Unsubscribe from an address
+  rpc Unsubscribe(UnsubscribeOp) returns (google.protobuf.Empty) {}
+
+  // Health check
+  rpc Ping(google.protobuf.Empty) returns (google.protobuf.Empty) {}
+}
+
+// Message used for publishing to an address
+message PublishOp {
+  // The address the message was sent to
+  string address = 1;
+
+  // Message headers
+  map<string, string> headers = 2;
+
+  // Message payload
+  JsonValue body = 3;
+}
+
+// Message used for sending to an address (point-to-point)
+message SendOp {
+  // The address the message was sent to
+  string address = 1;
+
+  // Message headers
+  map<string, string> headers = 2;
+
+  // Message payload
+  JsonValue body = 3;
+
+  // Timeout in milliseconds
+  google.protobuf.Duration timeout = 4;
+}
+
+// Message used for request-reply pattern
+message RequestOp {
+  // The address the message was sent to
+  string address = 1;
+
+  // Message headers
+  map<string, string> headers = 2;
+
+  // Message payload
+  JsonValue body = 3;
+
+  // The desired format of the reply body
+  JsonValueFormat reply_body_format = 4;
+
+  // Timeout in milliseconds
+  google.protobuf.Duration timeout = 5;
+}
+
+// Message used for subscribing to an address
+message SubscribeOp {
+  // The address to subscribe to
+  string address = 1;
+
+  // Message headers
+  map<string, string> headers = 2;
+
+  // The desired format of the message body sent by the bridge
+  JsonValueFormat message_body_format = 3;
+}
+
+// Message used for unsubscribing from an address
+message UnsubscribeOp {
+  // The consumer ID for subscription management
+  string consumer_id = 1;
+}
+
+// Message received from the event bus
+message EventBusMessage {
+  // The address the message was sent to
+  string address = 1;
+
+  // The consumer ID for subscription management
+  string consumer_id = 2;
+
+  // Optional reply address
+  // Presence means that the message is expecting a reply at this reply address
+  // This reply address shall be used in Send rpc or Request rpc
+  string reply_address = 3;
+
+  // Message headers
+  map<string, string> headers = 4;
+
+  // Message payload
+  JsonValue body = 5;
+}
+
+enum JsonValueFormat {
+  // google.protobuf.Value (default)
+  proto = 0;
+  // protobuf encoded json string encoded as a byte array
+  binary = 1;
+  // protobuf encoded json string
+  text = 2;
+}
+
+// A json value wrapping various formats for the client convenience
+message JsonValue {
+  oneof value {
+    google.protobuf.Value proto = 1;
+    bytes binary = 2;
+    string text = 3;
+  }
+}
