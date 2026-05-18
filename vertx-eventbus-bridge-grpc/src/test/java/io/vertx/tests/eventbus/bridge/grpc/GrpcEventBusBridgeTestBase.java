@@ -31,6 +31,8 @@ import java.time.temporal.ChronoUnit;
 @RunWith(VertxUnitRunner.class)
 public abstract class GrpcEventBusBridgeTestBase {
 
+  public static final int DEFAULT_PORT = 8080;
+
   protected Vertx vertx;
   protected GrpcEventBusBridge bridge;
   protected HttpServer server;
@@ -133,7 +135,7 @@ public abstract class GrpcEventBusBridgeTestBase {
         .addService(bridge));
 
     server
-      .listen(7000)
+      .listen(DEFAULT_PORT)
       .await();
   }
 

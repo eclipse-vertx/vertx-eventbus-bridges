@@ -16,6 +16,7 @@ import io.vertx.grpc.client.InvalidStatusException;
 import io.vertx.grpc.common.GrpcStatus;
 import io.vertx.grpc.event.v1alpha.*;
 import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
 import java.util.concurrent.CompletableFuture;
@@ -30,12 +31,13 @@ import static org.junit.Assert.*;
 
 public class GrpcEventBusBridgeTest extends GrpcEventBusBridgeTestBase {
 
-  private static final SocketAddress BRIDGE_ADDRESS = SocketAddress.inetSocketAddress(7000, "localhost");
+  private static final SocketAddress BRIDGE_ADDRESS = SocketAddress.inetSocketAddress(DEFAULT_PORT, "localhost");
 
 
   private GrpcClient client;
   private EventBusBridgeGrpcClient grpcClient;
 
+  @Before
   @Override
   public void before() {
     super.before();
