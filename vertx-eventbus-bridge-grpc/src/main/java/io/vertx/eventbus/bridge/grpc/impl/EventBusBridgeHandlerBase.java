@@ -22,6 +22,7 @@ import io.vertx.grpc.event.v1alpha.EventBusMessage;
 import io.vertx.grpc.event.v1alpha.JsonValue;
 import io.vertx.grpc.event.v1alpha.JsonValueFormat;
 import io.vertx.grpc.server.GrpcServerRequest;
+import io.vertx.grpc.server.ServiceMethodInvoker;
 
 import java.util.HashMap;
 import java.util.List;
@@ -35,7 +36,7 @@ import java.util.regex.Pattern;
 /**
  * Abstract base class for all EventBus bridge handlers.
  */
-public abstract class EventBusBridgeHandlerBase<Req, Resp> implements Handler<GrpcServerRequest<Req, Resp>> {
+public abstract class EventBusBridgeHandlerBase<Req, Resp> implements ServiceMethodInvoker<Req, Resp>, Handler<GrpcServerRequest<Req, Resp>> {
 
   protected final EventBus bus;
   protected final BridgeOptions options;
@@ -50,6 +51,11 @@ public abstract class EventBusBridgeHandlerBase<Req, Resp> implements Handler<Gr
     this.bridgeEventHandler = bridgeEventHandler;
     this.compiledREs = compiledREs != null ? compiledREs : new HashMap<>();
     this.replies = replies;
+  }
+
+  @Override
+  public void invoke(GrpcServerRequest<Req, Resp> request) {
+    handle(request);
   }
 
   /**

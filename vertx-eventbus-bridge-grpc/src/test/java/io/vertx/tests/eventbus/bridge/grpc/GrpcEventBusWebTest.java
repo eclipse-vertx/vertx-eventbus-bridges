@@ -66,7 +66,7 @@ public class GrpcEventBusWebTest extends GrpcEventBusBridgeTestBase {
     super.before();
 
     // Create HTTP client with appropriate options for gRPC-Web
-    HttpClientOptions options = new HttpClientOptions().setDefaultHost("localhost").setDefaultPort(7000);
+    HttpClientOptions options = new HttpClientOptions().setDefaultHost("localhost").setDefaultPort(DEFAULT_PORT);
     this.client = vertx.createHttpClient(options);
 
     ping().await();
