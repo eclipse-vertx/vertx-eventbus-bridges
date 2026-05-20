@@ -10,7 +10,6 @@
   </parent>
 
   <artifactId>vertx-eventbus-bridge-common</artifactId>
-  <version>5.1.0-SNAPSHOT</version>
 
   <name>Vert.x - EventBus - Bridge - Common</name>
   <description>Vert.x eventbus bridge common configuration</description>
