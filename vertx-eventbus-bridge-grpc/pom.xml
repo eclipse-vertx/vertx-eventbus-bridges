@@ -88,7 +88,7 @@
         <artifactId>maven-dependency-plugin</artifactId>
         <executions>
           <execution>
-            <id>foo</id>
+            <id>get-vertx-grpc-protoc-plugin2</id>
             <goals>
               <goal>get</goal>
             </goals>
