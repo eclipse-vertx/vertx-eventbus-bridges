@@ -35,6 +35,11 @@
       <groupId>io.vertx</groupId>
       <artifactId>vertx-grpc-client</artifactId>
     </dependency>
+    <dependency>
+      <groupId>io.vertx</groupId>
+      <artifactId>vertx-grpc-protoc-plugin2</artifactId>
+      <optional>true</optional>
+    </dependency>
 
     <dependency>
       <groupId>junit</groupId>
@@ -106,13 +111,6 @@
             </goals>
           </execution>
         </executions>
-        <dependencies>
-          <dependency>
-            <groupId>io.vertx</groupId>
-            <artifactId>vertx-grpc-protoc-plugin2</artifactId>
-            <version>${project.version}</version>
-          </dependency>
-        </dependencies>
       </plugin>
       <plugin>
         <artifactId>maven-assembly-plugin</artifactId>
