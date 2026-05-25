@@ -20,8 +20,6 @@ import io.vertx.grpc.server.GrpcServerRequest;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 public class EventBusBridgeRequestHandler extends EventBusBridgeHandlerBase<RequestOp, EventBusMessage> {

@@ -10,7 +10,6 @@ import io.vertx.eventbus.bridge.grpc.impl.handler.*;
 import io.vertx.grpc.common.ServiceMethod;
 import io.vertx.grpc.common.ServiceName;
 import io.vertx.grpc.event.v1alpha.EventBusBridgeProto;
-import io.vertx.grpc.server.GrpcServer;
 import io.vertx.grpc.server.ServiceMethodInvoker;
 
 import java.util.HashMap;
