@@ -1,15 +1,13 @@
 name: vertx-eventbus-bridges (5.x-stable)
 on:
-  # Disabled for now (enable after 5.1 is created and VERTX_5_STABLE_BRANCH= 5.1)
-  workflow_dispatch
-#  push:
-#    branches:
-#      - '5.[0-9]+'
-#  pull_request:
-#    branches:
-#      - '5.[0-9]+'
-#  schedule:
-#    - cron: '0 6 * * *'
+  push:
+    branches:
+      - '5.[0-9]+'
+  pull_request:
+    branches:
+      - '5.[0-9]+'
+  schedule:
+    - cron: '0 6 * * *'
 jobs:
   CI-CD:
     uses: ./.github/workflows/ci-matrix-5.x.yml
