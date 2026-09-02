@@ -10,7 +10,7 @@ import io.vertx.eventbus.bridge.grpc.impl.handler.*;
 import io.vertx.grpc.common.ServiceMethod;
 import io.vertx.grpc.common.ServiceName;
 import io.vertx.grpc.event.v1alpha.EventBusBridgeProto;
-import io.vertx.grpc.server.ServiceMethodInvoker;
+import io.vertx.grpc.server.GrpcServerRequest;
 
 import java.util.HashMap;
 import java.util.List;
@@ -73,19 +73,19 @@ public class GrpcEventBusBridgeImpl implements GrpcEventBusBridge {
   }
 
   @Override
-  public <Req, Resp> ServiceMethodInvoker invoker(ServiceMethod<Req, Resp> method) {
+  public <Req, Resp> Handler<GrpcServerRequest<Req, Resp>> handler(ServiceMethod<Req, Resp> method) {
     if (method.equals(EventBusBridgePublishHandler.SERVICE_METHOD)) {
-      return publisHandler;
+      return (Handler)publisHandler;
     } else if (method.equals(EventBusBridgeSendHandler.SERVICE_METHOD)) {
-      return sendHandler;
+      return (Handler)sendHandler;
     } else if (method.equals(EventBusBridgeRequestHandler.SERVICE_METHOD)) {
-      return requestHandler;
+      return (Handler)requestHandler;
     } else if (method.equals(EventBusBridgeSubscribeHandler.SERVICE_METHOD)) {
-      return subscribeHandler;
+      return (Handler)subscribeHandler;
     } else if (method.equals(EventBusBridgeUnsubscribeHandler.SERVICE_METHOD)) {
-      return unsubscribeHandler;
+      return (Handler)unsubscribeHandler;
     } else if (method.equals(EventBusBridgePingHandler.SERVICE_METHOD)) {
-      return pingHandler;
+      return (Handler)pingHandler;
     } else {
       return null;
     }
