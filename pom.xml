@@ -12,7 +12,7 @@
   <packaging>pom</packaging>
 
   <artifactId>vertx-eventbus-bridge-parent</artifactId>
-  <version>5.2.1</version>
+  <version>5.2.2-SNAPSHOT</version>
 
   <name>Vert.x Bridge parent</name>
   <description>Vert.x eventbus bridge parent</description>
